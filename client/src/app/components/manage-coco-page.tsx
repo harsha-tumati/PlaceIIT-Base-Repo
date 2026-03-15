@@ -69,6 +69,7 @@ export function ManageCoCoPage({ onCoCoClick }: ManageCoCoPageProps) {
   const [newCoCoName, setNewCoCoName] = useState("");
   const [newCoCoEmail, setNewCoCoEmail] = useState("");
   const [newCoCoPhone, setNewCoCoPhone] = useState("");
+  const [newCoCoRollNumber, setNewCoCoRollNumber] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [addMethod, setAddMethod] = useState<"manual" | "excel">("manual");
   const [companySearchQuery, setCompanySearchQuery] = useState("");
@@ -124,12 +125,16 @@ export function ManageCoCoPage({ onCoCoClick }: ManageCoCoPageProps) {
   }, [fetchAll]);
 
   const handleAddCoCo = async () => {
-    if (!newCoCoName || !newCoCoEmail) return;
+    if (!newCoCoName || !newCoCoEmail || !newCoCoRollNumber) {
+      toast.error("Name, Email, and Roll Number are required");
+      return;
+    }
     setSaving(true);
     try {
       await adminApi.registerUser({ 
         name: newCoCoName, 
         email: newCoCoEmail, 
+        rollNumber: newCoCoRollNumber,
         instituteId: newCoCoEmail.split('@')[0], // fallback instituteId
         password: "password123", // default password
         role: "coco" 
@@ -138,6 +143,7 @@ export function ManageCoCoPage({ onCoCoClick }: ManageCoCoPageProps) {
       setNewCoCoName("");
       setNewCoCoEmail("");
       setNewCoCoPhone("");
+      setNewCoCoRollNumber("");
       setIsAddDialogOpen(false);
       await fetchAll();
     } catch (err: any) {
@@ -317,6 +323,10 @@ export function ManageCoCoPage({ onCoCoClick }: ManageCoCoPageProps) {
                     <div className="space-y-2">
                       <Label htmlFor="phone">Phone</Label>
                       <Input id="phone" placeholder="Enter phone number" value={newCoCoPhone} onChange={(e) => setNewCoCoPhone(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="rollNumber">Roll Number *</Label>
+                      <Input id="rollNumber" placeholder="Enter roll number (e.g. 2021CS101)" value={newCoCoRollNumber} onChange={(e) => setNewCoCoRollNumber(e.target.value)} />
                     </div>
                   </div>
                 ) : (

@@ -261,6 +261,12 @@ const autoAllocateCocos = async (req, res) => {
       return res.status(400).json({ message: "Need both CoCos and companies to allocate" });
     }
 
+    // Clear existing assignments to ensure fresh allocation
+    await Promise.all([
+      Coordinator.updateMany({}, { $set: { assignedCompanies: [] } }),
+      Company.updateMany({}, { $set: { assignedCocos: [] } })
+    ]);
+
     // Shuffle for random distribution
     const shuffledCocos = [...cocos].sort(() => Math.random() - 0.5);
     let cocoIndex = 0;

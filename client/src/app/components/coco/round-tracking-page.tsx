@@ -47,9 +47,9 @@ export function RoundTrackingPage({ companyName, onBack }: RoundTrackingPageProp
   const [panelsByRound, setPanelsByRound] = useState<Record<number, Panel[]>>({});
   const [roundIds, setRoundIds] = useState<Record<number, string>>({});
   const [selectedRoundForAdd, setSelectedRoundForAdd] = useState(1);
-  const [studentSearchForAdd, setStudentSearchForAdd] = useState("");
   const [addingStudent, setAddingStudent] = useState(false);
-  const [foundStudents, setFoundStudents] = useState<any[]>([]);
+  const [shortlistedForAdd, setShortlistedForAdd] = useState<any[]>([]);
+  const [loadingShortlist, setLoadingShortlist] = useState(false);
 
   const normalizeStudent = (raw: any, i: number, round: number): Student => {
     const statusRaw: string = raw.status ?? raw.queueEntry?.status ?? "in-queue";
@@ -146,15 +146,24 @@ export function RoundTrackingPage({ companyName, onBack }: RoundTrackingPageProp
   }, [socket, companyId, fetchData]);
   // ─────────────────────────────────────────────────────────────────────────
 
-  const handleSearchStudent = async () => {
-    if (!studentSearchForAdd) return;
+  const fetchShortlistForAdd = async () => {
+    if (!companyId) return;
+    setLoadingShortlist(true);
     try {
-      const data: any = await cocoApi.searchStudents(studentSearchForAdd);
-      setFoundStudents(Array.isArray(data) ? data : data.students ?? []);
+      const data: any = await cocoApi.getShortlistedStudents(companyId);
+      setShortlistedForAdd(Array.isArray(data) ? data : data.students ?? []);
     } catch {
-      toast.error("Failed to search students");
+      toast.error("Failed to load shortlisted students");
+    } finally {
+      setLoadingShortlist(false);
     }
   };
+
+  useEffect(() => {
+    if (isAddStudentOpen && companyId) {
+      fetchShortlistForAdd();
+    }
+  }, [isAddStudentOpen, companyId]);
 
   const handleAddStudentToRound = async (studentId: string) => {
     const roundId = roundIds[selectedRoundForAdd];
@@ -320,40 +329,44 @@ export function RoundTrackingPage({ companyName, onBack }: RoundTrackingPageProp
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Student Search</Label>
-                  <div className="flex gap-2">
-                    <Input 
-                      placeholder="Name or Roll Number" 
-                      value={studentSearchForAdd}
-                      onChange={(e) => setStudentSearchForAdd(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSearchStudent()}
-                    />
-                    <Button onClick={handleSearchStudent} type="button" size="sm">Search</Button>
+                <div className="space-y-4 pt-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-gray-500 text-xs uppercase tracking-wider">Shortlisted Students</Label>
+                    {loadingShortlist && <Loader2 className="h-3 w-3 animate-spin text-gray-400" />}
+                  </div>
+                  
+                  <div className="max-h-64 overflow-y-auto space-y-2 border rounded-lg p-2 bg-gray-50/50">
+                    {shortlistedForAdd.length > 0 ? (
+                      shortlistedForAdd.map((s) => {
+                        const isInRound = (studentsByRound[selectedRoundForAdd] || []).some(
+                          (existing) => existing.id === s._id || existing.rollNo === s.rollNumber
+                        );
+                        
+                        return (
+                          <div key={s._id} className="flex items-center justify-between p-3 bg-white border rounded-md shadow-sm">
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm font-semibold text-gray-900 truncate">{s.name}</div>
+                              <div className="text-xs text-gray-500 font-medium">Roll: {s.rollNumber}</div>
+                            </div>
+                            <Button 
+                              size="sm" 
+                              variant={isInRound ? "outline" : "default"}
+                              className={isInRound ? "text-gray-400 border-gray-200" : "bg-indigo-600 hover:bg-indigo-700"}
+                              onClick={() => !isInRound && handleAddStudentToRound(s._id)}
+                              disabled={addingStudent || isInRound}
+                            >
+                              {isInRound ? "Added" : "Add"}
+                            </Button>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-center py-6 text-gray-400 text-sm">
+                        No shortlisted students found for this company.
+                      </div>
+                    )}
                   </div>
                 </div>
-                
-                {foundStudents.length > 0 && (
-                  <div className="max-h-48 overflow-y-auto space-y-2 border rounded p-2">
-                    {foundStudents.map((s) => (
-                      <div key={s._id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
-                        <div>
-                          <div className="text-sm font-medium">{s.name}</div>
-                          <div className="text-xs text-gray-500">{s.rollNumber}</div>
-                        </div>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="text-indigo-600"
-                          onClick={() => handleAddStudentToRound(s._id)}
-                          disabled={addingStudent}
-                        >
-                          Add
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </TabsContent>
               <TabsContent value="excel" className="space-y-4 pt-4">
                 <div className="space-y-2">

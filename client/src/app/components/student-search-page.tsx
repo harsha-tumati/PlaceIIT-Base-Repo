@@ -108,9 +108,11 @@ export function StudentSearchPage({ onStudentClick, fetchApi }: StudentSearchPag
       toast.success("Student added successfully!");
       setIsAddModalOpen(false);
       setFormData({ name: "", rollNumber: "", email: "", password: "", instituteId: "" });
-      fetchStudents(searchQuery);
+      // Clear search to show the new student or refresh current search
+      setSearchQuery("");
+      fetchStudents("");
     } catch (err: any) {
-      toast.error(err.message || "Failed to add student");
+      toast.error(err.message || "Failed to add student. Please check if Roll Number or Email already exists.");
     } finally {
       setIsSubmitting(false);
     }

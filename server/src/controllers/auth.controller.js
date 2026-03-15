@@ -62,8 +62,25 @@ const register = async (req, res) => {
   try {
     const { instituteId, email, password, role, name, rollNumber } = req.body;
 
+    if (!instituteId || !email || !password || !role || !name || !rollNumber) {
+      return res.status(400).json({ message: "All fields are required (instituteId, email, password, role, name, rollNumber)" });
+    }
+
     const existing = await User.findOne({ $or: [{ instituteId }, { email }] });
-    if (existing) return res.status(400).json({ message: "User already exists" });
+    if (existing) {
+      const conflict = existing.instituteId === instituteId ? "Institute ID" : "Email";
+      return res.status(400).json({ message: `User with this ${conflict} already exists` });
+    }
+
+    // Check for roll number uniqueness across both Student and Coordinator models
+    const [studentExists, cocoExists] = await Promise.all([
+      Student.findOne({ rollNumber }),
+      Coordinator.findOne({ rollNumber })
+    ]);
+
+    if (studentExists || cocoExists) {
+      return res.status(400).json({ message: "Roll number is already registered" });
+    }
 
     const user = await User.create({ instituteId, email, password, role });
 
