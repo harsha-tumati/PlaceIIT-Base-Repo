@@ -130,6 +130,9 @@ export const studentApi = {
     /** @deprecated use joinWalkInQueue */
     joinWalkIn: (companyId: string) =>
         request("/student/queue/walkin", { method: "POST", body: JSON.stringify({ companyId }) }),
+    /** Leave the queue for a company */
+    leaveQueue: (companyId: string) =>
+        request("/student/queue/leave", { method: "POST", body: JSON.stringify({ companyId }) }),
     getQueuePosition: (companyId: string) =>
         request(`/student/queue/${companyId}`),
     getWalkIns: () => request("/student/walkins"),

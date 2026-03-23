@@ -55,7 +55,11 @@ const getMyCompanies = async (req, res) => {
           companyId: company._id,
           studentId: student._id,
         });
-        return { ...company, queueEntry };
+        const totalInQueue = await Queue.countDocuments({
+          companyId: company._id,
+          status: "in_queue",
+        });
+        return { ...company, queueEntry, totalInQueue };
       })
     );
 
@@ -95,12 +99,42 @@ const joinWalkIn = async (req, res) => {
   }
 };
 
+// @desc    Leave queue for a company
+// @route   POST /api/student/queue/leave
+const leaveQueue = async (req, res) => {
+  try {
+    const { companyId } = req.body;
+    const student = await Student.findOne({ userId: req.user.id });
+    if (!student) return res.status(404).json({ message: "Student not found" });
+
+    const result = await queueService.leaveQueue(student._id, companyId);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+};
+
 // @desc    Get available walk-in companies
 // @route   GET /api/student/walkins
 const getWalkIns = async (req, res) => {
   try {
     const companies = await Company.find({ isWalkInEnabled: true, isActive: true });
-    res.json(companies);
+    const student = await Student.findOne({ userId: req.user.id });
+
+    const result = await Promise.all(
+      companies.map(async (c) => {
+        const totalInQueue = await Queue.countDocuments({
+          companyId: c._id,
+          status: "in_queue",
+        });
+        const queueEntry = student
+          ? await Queue.findOne({ companyId: c._id, studentId: student._id })
+          : null;
+        return { ...c.toObject(), totalInQueue, queueEntry };
+      })
+    );
+
+    res.json(result);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -154,6 +188,6 @@ const markNotifRead = async (req, res) => {
 
 module.exports = {
   getProfile, updateProfile, getMyCompanies,
-  joinQueue, joinWalkIn, getWalkIns, getQueuePosition,
+  joinQueue, joinWalkIn, leaveQueue, getWalkIns, getQueuePosition,
   getNotifications, markNotifRead,
 };

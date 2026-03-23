@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const {
   getProfile, updateProfile, getMyCompanies,
-  joinQueue, joinWalkIn, getWalkIns, getQueuePosition,
+  joinQueue, joinWalkIn, leaveQueue, getWalkIns, getQueuePosition,
   getNotifications, markNotifRead,
 } = require("../controllers/student.controller");
 const { protect } = require("../middlewares/auth.middleware");
@@ -15,6 +15,7 @@ router.put("/profile", updateProfile);
 router.get("/companies", getMyCompanies);
 router.post("/queue/join", joinQueue);
 router.post("/queue/walkin", joinWalkIn);
+router.post("/queue/leave", leaveQueue);
 router.get("/queue/:companyId", getQueuePosition);
 router.get("/walkins", getWalkIns);
 router.get("/notifications", getNotifications);
