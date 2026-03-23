@@ -60,7 +60,10 @@ export function ManageCompaniesPage({ onCompanyClick }: ManageCompaniesPageProps
     id: raw._id ?? raw.id ?? "",
     name: raw.name ?? "—",
     cocoAssigned: raw.assignedCocos?.length
-      ? raw.assignedCocos.map((c: any) => c.name ?? c).join(", ")
+      ? raw.assignedCocos.map((c: any) => {
+          const idStr = c.userId?.instituteId ? ` (${c.userId.instituteId})` : "";
+          return `${c.name ?? c}${idStr}`;
+        }).join(", ")
       : "Not Assigned",
     venue: raw.venue ?? "TBA",
     day: raw.day != null ? `Day ${raw.day}` : "—",

@@ -118,7 +118,12 @@ const toggleWalkIn = async (req, res) => {
 const addPanel = async (req, res) => {
   try {
     const { companyId, roundId, panelName, interviewers, venue } = req.body;
-    const panel = await Panel.create({ companyId, roundId, panelName, interviewers, venue });
+    let finalName = panelName;
+    if (!finalName || finalName.trim() === "") {
+      const count = await Panel.countDocuments({ companyId });
+      finalName = `Panel ${count + 1}`;
+    }
+    const panel = await Panel.create({ companyId, roundId, panelName: finalName, interviewers, venue });
     if (roundId) {
       await InterviewRound.findByIdAndUpdate(roundId, { $push: { panels: panel._id } });
     }
@@ -132,8 +137,92 @@ const addPanel = async (req, res) => {
 // @route   GET /api/coco/company/:companyId/panels
 const getPanels = async (req, res) => {
   try {
-    const panels = await Panel.find({ companyId: req.params.companyId });
+    const panels = await Panel.find({ companyId: req.params.companyId })
+      .populate("currentStudent", "name rollNumber")
+      .populate("roundId", "roundNumber roundName");
     res.json(panels);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// @desc    Update a panel
+// @route   PUT /api/coco/panel/:id
+const updatePanel = async (req, res) => {
+  try {
+    const { roundId, venue, status } = req.body;
+    const updateData = {};
+    if (roundId !== undefined) updateData.roundId = roundId;
+    if (venue !== undefined) updateData.venue = venue;
+    if (status !== undefined) updateData.status = status;
+    
+    const panel = await Panel.findByIdAndUpdate(req.params.id, updateData, { new: true });
+    
+    const { getIO } = require("../config/socket");
+    const io = getIO();
+    if (io && panel) io.to(panel.companyId.toString()).emit("status:updated");
+
+    res.json(panel);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// @desc    Assign student to empty panel
+// @route   PUT /api/coco/panel/:id/assign
+const assignPanelStudent = async (req, res) => {
+  try {
+    const { studentId } = req.body;
+    const panel = await Panel.findById(req.params.id);
+    if (!panel) return res.status(404).json({ message: "Panel not found" });
+
+    panel.status = "occupied";
+    panel.currentStudent = studentId;
+    await panel.save();
+
+    let queueEntry = await Queue.findOne({ studentId, companyId: panel.companyId, roundId: panel.roundId });
+    if (queueEntry) {
+      queueEntry.status = "in_interview";
+      queueEntry.panelId = panel._id;
+      queueEntry.interviewStartedAt = new Date();
+      await queueEntry.save();
+    }
+    
+    const { getIO } = require("../config/socket");
+    const io = getIO();
+    if (io) io.to(panel.companyId.toString()).emit("queue:updated");
+
+    res.json(panel);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// @desc    Clear a panel
+// @route   PUT /api/coco/panel/:id/clear
+const clearPanel = async (req, res) => {
+  try {
+    const panel = await Panel.findById(req.params.id);
+    if (!panel) return res.status(404).json({ message: "Panel not found" });
+
+    if (panel.currentStudent) {
+      let queueEntry = await Queue.findOne({ studentId: panel.currentStudent, companyId: panel.companyId, roundId: panel.roundId });
+      if (queueEntry) {
+        queueEntry.status = "completed";
+        queueEntry.completedAt = new Date();
+        await queueEntry.save();
+      }
+    }
+
+    panel.status = "unoccupied";
+    panel.currentStudent = null;
+    await panel.save();
+
+    const { getIO } = require("../config/socket");
+    const io = getIO();
+    if (io) io.to(panel.companyId.toString()).emit("queue:updated");
+
+    res.json(panel);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -397,7 +486,8 @@ const addStudentToCompany = async (req, res) => {
 module.exports = {
   getAssignedCompany, getShortlistedStudents, addStudentToQueue,
   updateStudentStatus, sendNotification, toggleWalkIn,
-  addPanel, getPanels, getRounds, addRound, getPredefinedNotifications,
+  addPanel, getPanels, updatePanel, assignPanelStudent, clearPanel,
+  getRounds, addRound, getPredefinedNotifications,
   searchAllStudents, addStudentToRound, uploadStudentsToRound,
   getCocoNotifications, markNotifRead, addStudentToCompany,
 };
