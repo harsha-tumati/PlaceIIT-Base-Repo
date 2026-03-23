@@ -204,14 +204,14 @@ export function RoundTrackingPage({ companyName, onBack }: RoundTrackingPageProp
     }
   };
 
-  const renderStudentCard = (student: Student, isNotInQueue = false, targetRound = 1) => (
+  const renderStudentCard = (student: Student, isNotInQueue = false, targetRound = 1, displayIndex?: number) => (
     <Card key={student.id} className="mb-3 border-gray-200 transition-all hover:border-gray-300">
       <CardContent className="p-3">
         <div className="flex items-center justify-between">
           <div className="flex-1">
             <p className="font-medium text-gray-900 text-sm">
-              {!isNotInQueue && student.position > 0 && (
-                <span className="text-indigo-600 font-bold mr-2 text-xs">#{student.position}</span>
+              {!isNotInQueue && (displayIndex || student.position > 0) && (
+                <span className="text-indigo-600 font-bold mr-2 text-xs">#{displayIndex ?? student.position}</span>
               )}
               {student.name}
             </p>
@@ -324,7 +324,7 @@ export function RoundTrackingPage({ companyName, onBack }: RoundTrackingPageProp
               </h3>
             </div>
             <div className="space-y-1.5">
-               {inQueue.map(s => renderStudentCard(s))}
+               {inQueue.map((s, idx) => renderStudentCard(s, false, round, idx + 1))}
                {inQueue.length === 0 && <div className="text-center py-6 text-xs text-gray-400 bg-gray-50 rounded border border-dashed border-gray-200">Queue is empty.</div>}
             </div>
           </div>
@@ -339,7 +339,7 @@ export function RoundTrackingPage({ companyName, onBack }: RoundTrackingPageProp
                  </h3>
                </div>
                <div className="space-y-1.5 opacity-75 hover:opacity-100 transition-opacity">
-                 {completed.map(s => renderStudentCard(s))}
+                 {completed.map((s, idx) => renderStudentCard(s, false, round, idx + 1))}
                </div>
             </div>
           )}
