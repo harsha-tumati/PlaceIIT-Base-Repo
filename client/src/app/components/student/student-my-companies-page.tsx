@@ -132,7 +132,7 @@ export function StudentMyCompaniesPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Slots</SelectItem>
-                {uniqueSlots.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                {uniqueSlots.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
