@@ -40,7 +40,6 @@ export function StudentHomePage() {
   const { socket } = useSocket();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSlot, setSelectedSlot] = useState("all");
-  const [selectedDay, setSelectedDay] = useState("all");
   const [companies, setCompanies] = useState<Company[]>([]);
   const [walkinCompanies, setWalkinCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
@@ -183,12 +182,10 @@ export function StudentHomePage() {
       company.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       company.role.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesSlot = selectedSlot === "all" || company.slot === selectedSlot;
-    const matchesDay = selectedDay === "all" || company.day === selectedDay;
-    return matchesSearch && matchesSlot && matchesDay;
+    return matchesSearch && matchesSlot;
   });
 
   const uniqueSlots = [...new Set([...companies, ...walkinCompanies].map((c) => c.slot))].filter(Boolean);
-  const uniqueDays = [...new Set([...companies, ...walkinCompanies].map((c) => c.day))].filter(Boolean);
 
   const renderCompanyCard = (company: Company) => (
     <Card key={company.id} className="hover:shadow-lg transition-shadow">
@@ -312,15 +309,6 @@ export function StudentHomePage() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
               <Input placeholder="Search by company name or role…" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
             </div>
-            <Select value={selectedDay} onValueChange={setSelectedDay}>
-              <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder="Select Day" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Days</SelectItem>
-                {uniqueDays.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-              </SelectContent>
-            </Select>
             <Select value={selectedSlot} onValueChange={setSelectedSlot}>
               <SelectTrigger className="w-full md:w-48">
                 <SelectValue placeholder="Select Slot" />
