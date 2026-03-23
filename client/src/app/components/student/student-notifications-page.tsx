@@ -17,6 +17,7 @@ import { Bell, CheckCircle, AlertCircle, Info, Building2, Clock, Search, Loader2
 import { useState, useEffect, useCallback } from "react";
 import { studentApi } from "@/app/lib/api";
 import { useSocket } from "@/app/socket-context";
+import { useAuth } from "@/app/auth-context";
 import { toast } from "sonner";
 
 interface Notification {
@@ -31,6 +32,7 @@ interface Notification {
 
 export function StudentNotificationsPage() {
   const { socket } = useSocket();
+  const auth = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -52,7 +54,9 @@ export function StudentNotificationsPage() {
     try {
       const data: any = await studentApi.getNotifications();
       const list = Array.isArray(data) ? data : data.notifications ?? [];
-      setNotifications(list.map(normalizeNotif));
+      const mapped = list.map(normalizeNotif);
+      setNotifications(mapped);
+      auth.setUnreadNotificationsCount(mapped.filter((n: Notification) => !n.isRead).length);
     } catch {
       setNotifications([]);
     } finally {
@@ -78,9 +82,11 @@ export function StudentNotificationsPage() {
   const handleMarkRead = async (id: string) => {
     try {
       await studentApi.markNotifRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-      );
+      setNotifications((prev) => {
+        const updated = prev.map((n) => (n.id === id ? { ...n, isRead: true } : n));
+        auth.setUnreadNotificationsCount(updated.filter((n) => !n.isRead).length);
+        return updated;
+      });
     } catch {
       toast.error("Failed to mark as read");
     }
@@ -90,6 +96,7 @@ export function StudentNotificationsPage() {
     try {
       await studentApi.markAllNotifRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      auth.setUnreadNotificationsCount(0);
       toast.success("All notifications marked as read");
     } catch {
       toast.error("Failed to mark all as read");
@@ -100,6 +107,7 @@ export function StudentNotificationsPage() {
     try {
       await studentApi.clearAllNotifications();
       setNotifications([]);
+      auth.setUnreadNotificationsCount(0);
       setShowClearConfirm(false);
       toast.success("All notifications cleared");
     } catch {
