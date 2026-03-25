@@ -44,9 +44,6 @@ interface StudentDetailsPageProps {
   email: string;
   phone: string;
   emergencyContact: string;
-  department: string;
-  cgpa: number;
-  resumeUrl: string;
   inInterview: boolean;
   interviewWith?: string;
   interviewVenue?: string;
@@ -62,9 +59,6 @@ export function StudentDetailsPage({
   email,
   phone,
   emergencyContact,
-  department,
-  cgpa,
-  resumeUrl,
   inInterview,
   interviewWith,
   interviewVenue,
@@ -186,21 +180,6 @@ export function StudentDetailsPage({
               </div>
             </div>
 
-            <div className="flex items-start gap-3 bg-indigo-50 p-4 rounded-lg">
-              <Building2 className="h-5 w-5 text-indigo-600 mt-0.5" />
-              <div>
-                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Department</div>
-                <div className="font-semibold text-gray-900">{department}</div>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3 bg-indigo-50 p-4 rounded-lg">
-              <GraduationCap className="h-5 w-5 text-indigo-600 mt-0.5" />
-              <div>
-                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">CGPA</div>
-                <div className="font-semibold text-gray-900">{cgpa}</div>
-              </div>
-            </div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-6 mt-6">
@@ -227,34 +206,36 @@ export function StudentDetailsPage({
                 <div className="font-medium text-gray-900">{emergencyContact}</div>
               </div>
             </div>
-
-            <div className="flex items-start gap-3 bg-gray-50 p-4 rounded-lg">
-              <FileText className="h-5 w-5 text-indigo-600 mt-0.5" />
-              <div className="flex-1">
-                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Resume</div>
-                <a
-                  href={resumeUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium text-indigo-600 hover:text-indigo-700 underline"
-                >
-                  View Resume
-                </a>
-              </div>
-            </div>
-          </div>
-
-          {inInterview && interviewWith && (
-            <div className="flex items-start gap-3 bg-yellow-50 p-4 rounded-lg border border-yellow-200 mt-6">
-              <Clock className="h-5 w-5 text-yellow-700 mt-0.5" />
-              <div className="flex-1">
-                <div className="text-xs font-semibold text-yellow-700 uppercase tracking-wide mb-1">Current Interview</div>
-                <div className="font-medium text-gray-900">
-                  Interviewing with {interviewWith} at {interviewVenue}
+            {inInterview && interviewWith ? (
+              <div className="flex items-start gap-3 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                <Clock className="h-5 w-5 text-yellow-700 mt-0.5" />
+                <div className="flex-1">
+                  <div className="text-xs font-semibold text-yellow-700 uppercase tracking-wide mb-1">Current Interview</div>
+                  <div className="font-medium text-gray-900">
+                    Interviewing with {interviewWith} at {interviewVenue}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            ) : queuedFor ? (
+              <div className="flex items-start gap-3 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <Clock className="h-5 w-5 text-blue-700 mt-0.5" />
+                <div className="flex-1">
+                  <div className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-1">Queue Status</div>
+                  <div className="font-medium text-gray-900">
+                    Waiting in queue for <span className="font-bold">{queuedFor}</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-3 bg-gray-50 p-4 rounded-lg border border-gray-100">
+                <Clock className="h-5 w-5 text-gray-400 mt-0.5" />
+                <div className="flex-1">
+                  <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Queue Status</div>
+                  <div className="font-medium text-gray-400">—</div>
+                </div>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -412,6 +393,6 @@ export function StudentDetailsPage({
           )}
         </div>
       </div>
-    </div>
+    </div >
   );
 }

@@ -49,7 +49,6 @@ export function APCHomeRoute() {
             userName={auth.userName}
             stats={stats}
             onNavigate={handleNavigate}
-            isMainAdmin={auth.isMainAdmin}
         />
     );
 }

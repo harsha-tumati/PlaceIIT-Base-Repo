@@ -196,7 +196,7 @@ const assignPanelStudent = async (req, res) => {
     panel.currentStudent = studentId;
     await panel.save();
 
-    let queueEntry = await Queue.findOne({ studentId, companyId: panel.companyId, roundId: panel.roundId });
+    let queueEntry = await Queue.findOne({ studentId, companyId: panel.companyId }).sort({ createdAt: -1 });
     if (queueEntry) {
       queueEntry.status = "in_interview";
       queueEntry.panelId = panel._id;
@@ -222,7 +222,7 @@ const clearPanel = async (req, res) => {
     if (!panel) return res.status(404).json({ message: "Panel not found" });
 
     if (panel.currentStudent) {
-      let queueEntry = await Queue.findOne({ studentId: panel.currentStudent, companyId: panel.companyId, roundId: panel.roundId });
+      let queueEntry = await Queue.findOne({ studentId: panel.currentStudent, companyId: panel.companyId }).sort({ createdAt: -1 });
       if (queueEntry) {
         queueEntry.status = "completed";
         queueEntry.completedAt = new Date();
