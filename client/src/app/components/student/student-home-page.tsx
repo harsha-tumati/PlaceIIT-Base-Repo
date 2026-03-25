@@ -17,7 +17,7 @@ interface Company {
   venue: string;
   day: string;
   slot: string;
-  status: "upcoming" | "in-queue" | "completed" | "rejected" | "offer_given";
+  status: "upcoming" | "in-queue" | "in-interview" | "completed" | "rejected" | "offer_given";
   queuePosition?: number;
   totalInQueue?: number;
   currentQueue?: number;
@@ -47,7 +47,11 @@ export function StudentHomePage() {
   const normalizeCompany = (raw: any, index: number, isWalkin = false): Company => {
     const queueEntry = raw.queueEntry ?? raw.queue ?? null;
     const statusRaw: string = queueEntry?.status ?? raw.status ?? "upcoming";
-    const status = (statusRaw === "in_queue" ? "in-queue" : statusRaw) as Company["status"];
+    const status = (
+      statusRaw === "in_queue" ? "in-queue" :
+      statusRaw === "in_interview" ? "in-interview" :
+      statusRaw
+    ) as Company["status"];
 
     const isInQueue = !!(queueEntry && ["in_queue", "in-queue"].includes(queueEntry.status ?? ""));
 
@@ -217,21 +221,16 @@ export function StudentHomePage() {
             </div>
           </div>
           <div className="flex flex-col items-end space-y-2">
-            {company.status === "completed" && (
-              <Badge className="bg-green-100 text-green-800 border-green-200"><CheckCircle className="h-3 w-3 mr-1" />Completed</Badge>
-            )}
-            {company.status === "offer_given" && (
-              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">🎉 Offer Given</Badge>
-            )}
-            {company.status === "rejected" && (
-              <Badge className="bg-red-100 text-red-800 border-red-200">Rejected</Badge>
-            )}
-            {(company.status === "in-queue" || company.status === "in_queue" as any) && (
-              <Badge className="bg-blue-100 text-blue-800 border-blue-200"><Clock className="h-3 w-3 mr-1" />In Queue</Badge>
-            )}
-            {company.status === "upcoming" && (
-              <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200"><AlertCircle className="h-3 w-3 mr-1" />Upcoming</Badge>
-            )}
+          {(() => {
+            const s = company.status;
+            if (s === "in-queue" || (s as any) === "in_queue")
+              return <Badge className="bg-blue-100 text-blue-800 border-blue-200"><Clock className="h-3 w-3 mr-1" />In Queue</Badge>;
+            if (s === "in-interview" || (s as any) === "in_interview")
+              return <Badge className="bg-purple-100 text-purple-800 border-purple-200"><Users className="h-3 w-3 mr-1" />In Interview</Badge>;
+            if (s === "completed" || s === "offer_given")
+              return <Badge className="bg-green-100 text-green-800 border-green-200"><CheckCircle className="h-3 w-3 mr-1" />Completed</Badge>;
+            return <Badge className="bg-gray-100 text-gray-600 border-gray-200"><AlertCircle className="h-3 w-3 mr-1" />Pending</Badge>;
+          })()}
           </div>
         </div>
       </CardHeader>
