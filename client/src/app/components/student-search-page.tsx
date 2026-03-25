@@ -16,9 +16,6 @@ interface Student {
   email: string;
   phone: string;
   emergencyContact: string;
-  department: string;
-  cgpa: number;
-  resumeUrl: string;
   inInterview: boolean;
   interviewWith?: string;
   interviewVenue?: string;
@@ -53,9 +50,6 @@ export function StudentSearchPage({ onStudentClick, fetchApi }: StudentSearchPag
     email: raw.email ?? "",
     phone: raw.phone || raw.contact || "Not Available",
     emergencyContact: raw.emergencyContact?.phone ?? "",
-    department: raw.branch ?? "Unknown",
-    cgpa: raw.cgpa ?? 0,
-    resumeUrl: raw.resume ?? raw.resumeUrl ?? "",
     inInterview: raw.inInterview ?? false,
     interviewWith: raw.interviewWith ?? undefined,
     interviewVenue: raw.interviewVenue ?? undefined,
@@ -180,47 +174,49 @@ export function StudentSearchPage({ onStudentClick, fetchApi }: StudentSearchPag
               </Button>
             </DialogTrigger>
             <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Student</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleAddStudent} className="space-y-4 pt-4">
-              <Input
-                placeholder="Full Name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
-              />
-              <Input
-                placeholder="Roll Number"
-                value={formData.rollNumber}
-                onChange={(e) => setFormData({ ...formData, rollNumber: e.target.value })}
-                required
-              />
-              <Input
-                placeholder="Email ID"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                required
-              />
-              <Input
-                placeholder="Phone Number (10 digits)"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                required
-                pattern="\d{10}"
-                title="Must be a valid 10-digit phone number"
-              />
-              <p className="text-xs text-gray-500">
-                A random secure password will be auto-generated and emailed to the student. They will be forced to reset it upon first login.
-              </p>
-              <Button type="submit" className="w-full bg-indigo-600" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Create Student Account
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+              <DialogHeader>
+                <DialogTitle>Add New Student</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleAddStudent} className="space-y-4 pt-4">
+                <Input
+                  placeholder="Full Name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+                <Input
+                  placeholder="Roll Number"
+                  value={formData.rollNumber}
+                  onChange={(e) => setFormData({ ...formData, rollNumber: e.target.value })}
+                  required
+                />
+                <Input
+                  placeholder="Email ID"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  required
+                  pattern="^[a-zA-Z0-9_.+-]+@iitk\.ac\.in$"
+                  title="Must be a valid @iitk.ac.in email address"
+                />
+                <Input
+                  placeholder="Phone Number (10 digits)"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  required
+                  pattern="\d{10}"
+                  title="Must be a valid 10-digit phone number"
+                />
+                <p className="text-xs text-gray-500">
+                  A random secure password will be auto-generated and emailed to the student. They will be forced to reset it upon first login.
+                </p>
+                <Button type="submit" className="w-full bg-indigo-600" disabled={isSubmitting}>
+                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Create Student Account
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -293,10 +289,6 @@ export function StudentSearchPage({ onStudentClick, fetchApi }: StudentSearchPag
                     </div>
                     <p className="text-sm text-gray-500 mt-1.5 font-medium">Roll No: {student.rollNo}</p>
                   </div>
-                  <div className="text-right bg-gray-50 px-4 py-2 rounded-lg">
-                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{student.department}</div>
-                    <div className="text-lg font-bold text-indigo-600 mt-1">CGPA: {student.cgpa}</div>
-                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -315,30 +307,14 @@ export function StudentSearchPage({ onStudentClick, fetchApi }: StudentSearchPag
                       <span className="text-sm text-gray-900 font-medium">{student.phone}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 bg-red-50 p-3 rounded-lg md:col-span-2">
+                  <div className="flex items-start gap-3 bg-red-50 p-3 rounded-lg">
                     <Phone className="h-5 w-5 text-red-600" />
                     <div>
                       <div className="text-xs text-red-600 font-semibold uppercase tracking-wide mb-0.5">Emergency Contact</div>
                       <span className="text-sm text-gray-900 font-medium">{student.emergencyContact || "—"}</span>
                     </div>
                   </div>
-                  {student.resumeUrl && (
-                    <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg">
-                      <FileText className="h-5 w-5 text-indigo-600" />
-                      <div>
-                        <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-0.5">Resume</div>
-                        <a
-                          href={student.resumeUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-indigo-600 font-medium hover:underline"
-                        >
-                          View Resume
-                        </a>
-                      </div>
-                    </div>
-                  )}
-                  {student.inInterview && (
+                  {student.inInterview ? (
                     <div className="flex items-center gap-3 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
                       <Clock className="h-5 w-5 text-yellow-700" />
                       <div>
@@ -348,8 +324,7 @@ export function StudentSearchPage({ onStudentClick, fetchApi }: StudentSearchPag
                         </span>
                       </div>
                     </div>
-                  )}
-                  {student.queuedFor && !student.inInterview && (
+                  ) : student.queuedFor ? (
                     <div className="flex items-center gap-3 bg-blue-50 p-3 rounded-lg border border-blue-200">
                       <Clock className="h-5 w-5 text-blue-700" />
                       <div>
@@ -357,6 +332,14 @@ export function StudentSearchPage({ onStudentClick, fetchApi }: StudentSearchPag
                         <span className="text-sm text-gray-900 font-medium">
                           Waiting in queue for {student.queuedFor}
                         </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                      <Clock className="h-5 w-5 text-gray-400" />
+                      <div>
+                        <div className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Queue Status</div>
+                        <span className="text-sm text-gray-400 font-medium">—</span>
                       </div>
                     </div>
                   )}
@@ -375,6 +358,6 @@ export function StudentSearchPage({ onStudentClick, fetchApi }: StudentSearchPag
           ))
         )}
       </div>
-    </div>
+    </div >
   );
 }
