@@ -87,10 +87,16 @@ export const authApi = {
 
     getMe: () => request<{ _id: string; instituteId: string; role: string; email: string; mustChangePassword?: boolean; isMainAdmin?: boolean }>("/auth/me"),
 
-    changePassword: (newPassword: string) =>
+    changePassword: (
+        newPassword: string,
+        profileData?: {
+            emergencyContact: { name: string; phone: string };
+            friendContact: { name: string; phone: string };
+        }
+    ) =>
         request<{ message: string; user: any }>("/auth/change-password", {
             method: "POST",
-            body: JSON.stringify({ newPassword }),
+            body: JSON.stringify({ newPassword, ...profileData }),
         }),
 
     forgotPassword: {

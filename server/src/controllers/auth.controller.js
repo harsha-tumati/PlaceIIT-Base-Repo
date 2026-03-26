@@ -214,7 +214,7 @@ const resetPassword = async (req, res) => {
 // @access  Private
 const changePassword = async (req, res) => {
   try {
-    const { newPassword } = req.body;
+    const { newPassword, emergencyContact, friendContact } = req.body;
 
     if (!newPassword || newPassword.length < 6) {
       return res.status(400).json({ message: "Password must be at least 6 characters" });
@@ -223,6 +223,36 @@ const changePassword = async (req, res) => {
     const user = await User.findById(req.user.id);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.role === ROLES.STUDENT) {
+      const emergencyName = emergencyContact?.name?.trim();
+      const emergencyPhone = emergencyContact?.phone?.trim();
+      const friendName = friendContact?.name?.trim();
+      const friendPhone = friendContact?.phone?.trim();
+
+      if (!emergencyName || !emergencyPhone || !friendName || !friendPhone) {
+        return res.status(400).json({ message: "Emergency and friend contact details are required" });
+      }
+
+      if (!/^\d{10}$/.test(emergencyPhone) || !/^\d{10}$/.test(friendPhone)) {
+        return res.status(400).json({ message: "Contact phone numbers must be exactly 10 digits" });
+      }
+
+      await Student.findOneAndUpdate(
+        { userId: user._id },
+        {
+          emergencyContact: {
+            name: emergencyName,
+            phone: emergencyPhone,
+          },
+          friendContact: {
+            name: friendName,
+            phone: friendPhone,
+          },
+          profileCompleted: true,
+        }
+      );
     }
 
     user.password = newPassword;

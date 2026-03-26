@@ -1,11 +1,5 @@
 import { Button } from "@/app/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from "@/app/components/ui/dropdown-menu";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -85,24 +79,13 @@ export function APCNavbar({ onNavigate, userName = "Admin", isMainAdmin }: APCNa
             )}
             
             <div className="flex items-center gap-3 ml-4 pl-4 border-l border-gray-200">
-              {/* Profile Dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="h-9 w-9 rounded-full bg-indigo-100 flex items-center justify-center hover:bg-indigo-200 transition-colors cursor-pointer border-0 outline-none">
-                    <User className="h-5 w-5 text-indigo-600" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <div className="px-2 py-2 border-b">
-                    <p className="text-sm font-medium text-gray-900">{userName}</p>
-                    <p className="text-xs text-gray-500">Administrator</p>
-                  </div>
-                  <DropdownMenuItem onClick={() => onNavigate?.("profile")}>
-                    <User className="h-4 w-4 mr-2" />
-                    My Profile
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <button
+                className="h-9 w-9 rounded-full bg-indigo-100 flex items-center justify-center hover:bg-indigo-200 transition-colors cursor-pointer border-0 outline-none"
+                onClick={() => onNavigate?.("profile")}
+                title={`${userName} - My Profile`}
+              >
+                <User className="h-5 w-5 text-indigo-600" />
+              </button>
 
               {/* Logout */}
               <AlertDialog>

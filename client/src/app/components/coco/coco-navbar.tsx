@@ -1,12 +1,6 @@
 import { Building2, User, LogOut, Briefcase, Users, Bell } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from "@/app/components/ui/dropdown-menu";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -99,24 +93,13 @@ export function CoCoNavbar({ onNavigate, userName, unreadNotifications = 0 }: Co
               </SheetContent>
             </Sheet>
 
-            {/* Profile Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="h-9 w-9 rounded-full bg-green-100 flex items-center justify-center hover:bg-green-200 transition-colors cursor-pointer border-0 outline-none">
-                  <User className="h-5 w-5 text-green-600" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <div className="px-2 py-2 border-b">
-                  <p className="text-sm font-medium text-gray-900">{userName}</p>
-                  <p className="text-xs text-gray-500">Coordinator</p>
-                </div>
-                <DropdownMenuItem onClick={() => onNavigate("profile")}>
-                  <User className="h-4 w-4 mr-2" />
-                  My Profile
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <button
+              className="h-9 w-9 rounded-full bg-green-100 flex items-center justify-center hover:bg-green-200 transition-colors cursor-pointer border-0 outline-none"
+              onClick={() => onNavigate("profile")}
+              title={`${userName} - My Profile`}
+            >
+              <User className="h-5 w-5 text-green-600" />
+            </button>
 
             {/* Logout */}
             <AlertDialog>
