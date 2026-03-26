@@ -248,7 +248,13 @@ const getWalkIns = async (req, res) => {
 
     const result = await Promise.all(
       companies.map(async (c) => {
-        const queueEntries = student ? await Queue.find({ companyId: c._id, studentId: student._id }) : [];
+        const queueEntries = student
+          ? await Queue.find({
+            companyId: c._id,
+            studentId: student._id,
+            status: { $nin: ["rejected", "completed", "offer_given"] },
+          })
+          : [];
 
         if (queueEntries.length === 0) {
           return [{
@@ -280,13 +286,7 @@ const getWalkIns = async (req, res) => {
       })
     );
 
-    const flatResult = result.flat();
-    const terminalStatuses = ["completed", "offer_given", "rejected"];
-    const filteredResult = flatResult.filter(
-      (c) => !c.queueEntry || !terminalStatuses.includes(c.queueEntry.status)
-    );
-
-    res.json(filteredResult);
+    res.json(result.flat());
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
