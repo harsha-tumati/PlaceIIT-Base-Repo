@@ -51,14 +51,15 @@ const createApc = async (data) => {
     contact,
   });
 
+  let emailSent = false;
   try {
     await sendCocoWelcomeEmail(finalEmail, name, instituteId, finalPassword);
+    emailSent = true;
   } catch (emailErr) {
-    console.error(`[createApc] Failed to send welcome email to ${finalEmail}:`, emailErr);
-    throw new Error(`Account created successfully, but welcome email failed to send to ${finalEmail}`);
+    console.error(`[createApc] Non-fatal: Failed to send welcome email to ${finalEmail}:`, emailErr);
   }
 
-  return { apc, credentials: { instituteId, password: finalPassword } };
+  return { apc, credentials: { instituteId, password: finalPassword }, emailSent };
 };
 
 module.exports = {

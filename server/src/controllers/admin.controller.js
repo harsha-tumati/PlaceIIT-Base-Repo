@@ -296,18 +296,14 @@ const addApc = async (req, res) => {
       return res.status(403).json({ message: "Only main admin can create APCs" });
     }
 
-    try {
-      const result = await createApc({ name, email, rollNumber, contact });
-      await emitStatsUpdate(); // optional: emit stats
-      res.status(201).json({ message: "APC added successfully and invitation email sent", ...result });
-    } catch (err) {
-      if (err.message.includes("Account created successfully, but welcome email failed")) {
-         await emitStatsUpdate();
-         res.status(201).json({ message: err.message });
-      } else {
-         throw err;
-      }
-    }
+    const result = await createApc({ name, email, rollNumber, contact });
+    await emitStatsUpdate();
+
+    const resMessage = result.emailSent
+      ? "APC added successfully"
+      : "APC added successfully (Warning: Welcome email could not be sent)";
+
+    res.status(201).json({ message: resMessage, ...result });
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
