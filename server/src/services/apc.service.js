@@ -1,14 +1,13 @@
 const User = require("../models/User.model");
 const Apc = require("../models/Apc.model");
 const crypto = require("crypto");
-// Using the same email sender for simplicity or creating a new one. We can reuse sendCocoWelcomeEmail or make sendApcWelcomeEmail
-const { sendWelcomeEmail } = require("./email.service"); // let's just use existing ones
+const { sendApcWelcomeEmail } = require("./email.service");
 
 const createApc = async (data) => {
-  const { name, email, contact, rollNumber } = data; // accept rollNumber as instituteId for legacy compat
+  const { name, email, rollNumber, contact } = data;
 
-  if (!name || !email || !contact) {
-    throw new Error("Name, Email, and Phone Number are required");
+  if (!name || !email || !rollNumber || !contact) {
+    throw new Error("Name, Email, Roll Number, and Phone Number are required");
   }
 
   // Validate email format
@@ -20,23 +19,20 @@ const createApc = async (data) => {
   if (!phoneRegex.test(contact)) throw new Error(`Invalid phone number format for ${contact} (must be 10 digits)`);
 
   const finalEmail = email.toLowerCase();
-  
+
   // Check if user already exists
   const existingEmail = await User.findOne({ email: finalEmail });
   if (existingEmail) throw new Error(`User already exists with email: ${finalEmail}`);
 
-  let instituteId = rollNumber;
-  if (!instituteId) {
-    let nextX = await Apc.countDocuments() + 1;
-    instituteId = `apc${nextX}`;
-    while (await User.exists({ instituteId })) {
-      nextX++;
-      instituteId = `apc${nextX}`;
-    }
-  }
+  const existingRoll = await Apc.findOne({ rollNumber });
+  if (existingRoll) throw new Error(`APC already exists with Roll Number: ${rollNumber}`);
 
-  const existingInstituteId = await User.findOne({ instituteId });
-  if (existingInstituteId) throw new Error(`User already exists with Institute ID: ${instituteId}`);
+  let nextX = await Apc.countDocuments() + 1;
+  let instituteId = `apc${nextX}`;
+  while (await User.exists({ instituteId })) {
+    nextX++;
+    instituteId = `apc${nextX}`;
+  }
 
   const finalPassword = crypto.randomBytes(4).toString("hex");
 
@@ -45,25 +41,25 @@ const createApc = async (data) => {
     email: finalEmail,
     password: finalPassword,
     role: "admin",
-    isMainAdmin: false,
-    mustChangePassword: true
+    mustChangePassword: true,
   });
 
   const apc = await Apc.create({
     userId: user._id,
     name,
+    rollNumber,
     contact,
   });
 
+  let emailSent = false;
   try {
-     // Reusing the welcome email structure used for students for simplicity, since it takes email, name, instituteId, password
-    await sendWelcomeEmail(finalEmail, name, instituteId, finalPassword);
+    await sendApcWelcomeEmail(finalEmail, name, instituteId, finalPassword);
+    emailSent = true;
   } catch (emailErr) {
-    console.error(`[createApc] Failed to send welcome email to ${finalEmail}:`, emailErr);
-    throw new Error(`Account created successfully, but welcome email failed to send to ${finalEmail}`);
+    console.error(`[createApc] Non-fatal: Failed to send welcome email to ${finalEmail}:`, emailErr);
   }
 
-  return { apc, credentials: { instituteId, password: finalPassword } };
+  return { apc, credentials: { instituteId, password: finalPassword }, emailSent };
 };
 
 module.exports = {

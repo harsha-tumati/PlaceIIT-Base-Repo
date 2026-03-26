@@ -21,12 +21,12 @@ interface AuthState {
     userId: string;
     userName: string;
     token: string | null;
+    isMainAdmin: boolean;
     login: (instituteId: string, password: string, role?: UserRole) => Promise<{ success: boolean; error?: string }>;
     logout: () => void;
     /** Whether the user is required to change their password */
     userMustChangePassword: boolean;
     setUserMustChangePassword: (val: boolean) => void;
-    isMainAdmin: boolean;
     /** legacy mock login for testing without server */
     mockLogin: (role: UserRole, id: string, name: string) => void;
     // Notification counts (shared state)
@@ -34,6 +34,8 @@ interface AuthState {
     setUnreadNotificationsCount: (n: number) => void;
     cocoUnreadNotificationsCount: number;
     setCocoUnreadNotificationsCount: (n: number) => void;
+    apcUnreadNotificationsCount: number;
+    setApcUnreadNotificationsCount: (n: number) => void;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -54,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [isMainAdmin, setIsMainAdmin] = useState(false);
     const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
     const [cocoUnreadNotificationsCount, setCocoUnreadNotificationsCount] = useState(0);
+    const [apcUnreadNotificationsCount, setApcUnreadNotificationsCount] = useState(0);
     const [loading, setLoading] = useState(true);
 
     // Restore session from localStorage on mount
@@ -119,6 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsMainAdmin(false);
         setUnreadNotificationsCount(0);
         setCocoUnreadNotificationsCount(0);
+        setApcUnreadNotificationsCount(0);
     };
 
     if (loading) {
@@ -137,16 +141,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 userId,
                 userName,
                 token,
+                isMainAdmin,
                 login,
                 logout,
                 userMustChangePassword,
                 setUserMustChangePassword,
-                isMainAdmin,
                 mockLogin,
                 unreadNotificationsCount,
                 setUnreadNotificationsCount,
                 cocoUnreadNotificationsCount,
                 setCocoUnreadNotificationsCount,
+                apcUnreadNotificationsCount,
+                setApcUnreadNotificationsCount,
             }}
         >
             {children}

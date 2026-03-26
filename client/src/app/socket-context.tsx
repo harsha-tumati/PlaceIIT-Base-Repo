@@ -39,8 +39,8 @@ export function SocketProvider({ children, userId }: SocketProviderProps) {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    // Connect to the same origin – Vite proxies /socket.io → localhost:5001
-    const socket = io("/", {
+    // Connect directly to the backend to bypass Vite proxy crash on Bun
+    const socket = io("http://127.0.0.1:5000", {
       transports: ["websocket", "polling"],
       autoConnect: true,
     });

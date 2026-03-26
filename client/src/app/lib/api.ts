@@ -169,6 +169,7 @@ export const studentApi = {
             return data;
         });
     },
+    getDriveState: () => request("/student/drive-state"),
 };
 
 /* ═══════════════════════════════════════════════════════════
@@ -184,6 +185,8 @@ export const cocoApi = {
         request(`/coco/company/${companyId}/panels`),
     toggleWalkIn: (companyId: string, data: { enabled: boolean }) =>
         request(`/coco/company/${companyId}/walkin`, { method: "PUT", body: JSON.stringify(data) }),
+    updateVenue: (companyId: string, venue: string) =>
+        request(`/coco/company/${companyId}/venue`, { method: "PUT", body: JSON.stringify({ venue }) }),
     addStudentToQueue: (data: { companyId: string; studentId: string }) =>
         request("/coco/queue/add", { method: "POST", body: JSON.stringify(data) }),
     updateStudentStatus: (data: { studentId: string; companyId: string; status: string; round?: string }) =>
@@ -234,6 +237,7 @@ export const cocoApi = {
     /** Mark student interview as completed */
     markCompleted: (data: { studentId: string; companyId: string; round?: string }) =>
         request("/coco/queue/complete", { method: "PUT", body: JSON.stringify(data) }),
+    getDriveState: () => request("/coco/drive-state"),
 };
 
 /* ═══════════════════════════════════════════════════════════
@@ -255,14 +259,6 @@ export const adminApi = {
     /** Add a new Student directly (name, rollNumber only required) */
     addStudent: (data: Record<string, unknown>) =>
         request("/admin/students", { method: "POST", body: JSON.stringify(data) }),
-    /** Add an APC */
-    addApc: (data: Record<string, unknown>) =>
-        request("/admin/apc", { method: "POST", body: JSON.stringify(data) }),
-    getApcs: () => request("/admin/apcs"),
-    removeApc: (data: { apcId: string }) =>
-        request("/admin/remove-apc", { method: "POST", body: JSON.stringify(data) }),
-    uploadApcExcel: (formData: FormData) =>
-        uploadRequest("/admin/upload/apcs", formData),
     assignCoco: (data: { cocoId: string; companyId: string }) =>
         request("/admin/assign-coco", { method: "POST", body: JSON.stringify(data) }),
     removeCoco: (data: { cocoId: string; companyId: string }) =>
@@ -294,6 +290,24 @@ export const adminApi = {
     getQueries: () => request("/admin/queries"),
     respondToQuery: (id: string, data: { response: string; status: string }) =>
         request(`/admin/queries/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    /** Add an APC */
+    addApc: (data: Record<string, unknown>) =>
+        request("/admin/apc", { method: "POST", body: JSON.stringify(data) }),
+    getApcs: () => request("/admin/apcs"),
+    removeApc: (data: { apcId: string }) =>
+        request("/admin/remove-apc", { method: "POST", body: JSON.stringify(data) }),
+    uploadApcExcel: (formData: FormData) =>
+        uploadRequest("/admin/upload/apcs", formData),
+    getDriveState: () => request("/admin/drive-state"),
+    updateDriveState: (data: { day: number; slot: string }) =>
+        request("/admin/drive-state", { method: "PUT", body: JSON.stringify(data) }),
+    sendBroadcastNotification: (data: { message: string; type: string; audience: string }) =>
+        request("/admin/broadcast-notification", { method: "POST", body: JSON.stringify(data) }),
+    getNotifications: () => request("/admin/notifications"),
+    markNotifRead: (id: string) =>
+        request(`/admin/notifications/${id}/read`, { method: "PUT" }),
+    clearAllNotifications: () =>
+        request("/admin/notifications", { method: "DELETE" }),
 };
 
 /* ═══════════════════════════════════════════════════════════

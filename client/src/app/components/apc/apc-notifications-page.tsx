@@ -1,10 +1,9 @@
 import { Badge } from "@/app/components/ui/badge";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
 import { Bell, CheckCircle, AlertCircle, Info, Building2, Clock, Search, Loader2, User, ShieldAlert, Trash2 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
-import { cocoApi } from "@/app/lib/api";
+import { adminApi } from "@/app/lib/api";
 import { useSocket } from "@/app/socket-context";
 import { useAuth } from "@/app/auth-context";
 
@@ -22,11 +21,10 @@ interface Notification {
   read?: boolean;
 }
 
-export function CoCoNotificationsPage() {
+export function APCNotificationsPage() {
   const { socket } = useSocket();
   const auth = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedFilter, setSelectedFilter] = useState("all");
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -46,7 +44,7 @@ export function CoCoNotificationsPage() {
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
     try {
-      const data: any = await cocoApi.getNotifications();
+      const data: any = await adminApi.getNotifications();
       const list = Array.isArray(data) ? data : data.notifications ?? [];
       setNotifications(list.map(normalizeNotif));
     } catch {
@@ -58,7 +56,7 @@ export function CoCoNotificationsPage() {
 
   useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
 
-  // ── Real-time ───────────────────────────────────────────────────────────
+  // Real-time
   useEffect(() => {
     if (!socket) return;
     const handleNewNotif = (raw: any) => {
@@ -68,69 +66,59 @@ export function CoCoNotificationsPage() {
     socket.on("notification:sent", handleNewNotif);
     return () => { socket.off("notification:sent", handleNewNotif); };
   }, [socket]);
-  // ── Sync Unread Count to Navbar ─────────────────────────────────────────
+
+  // Sync Unread Count
   useEffect(() => {
     if (!loading) {
-      // Robust calculation: filter isRead and read (compat)
       const unread = notifications.filter(n => !n.isRead && !n.read).length;
-      auth.setCocoUnreadNotificationsCount(unread);
+      auth.setApcUnreadNotificationsCount(unread);
     }
   }, [notifications, loading, auth]);
-  // ─────────────────────────────────────────────────────────────────────────
 
   const handleMarkRead = async (id: string) => {
     try {
-      await cocoApi.markNotifRead(id);
+      await adminApi.markNotifRead(id);
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
       );
-    } catch {
-      // silently fail
-    }
+    } catch { /* silently fail */ }
   };
 
   const handleMarkAllRead = async () => {
     const unread = notifications.filter((n) => !n.isRead);
     for (const n of unread) {
-      try {
-        await cocoApi.markNotifRead(n.id);
-      } catch { /* skip */ }
+      try { await adminApi.markNotifRead(n.id); } catch { /* skip */ }
     }
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
   };
 
   const handleClearAll = async () => {
     try {
-      await cocoApi.clearAllNotifications();
+      await adminApi.clearAllNotifications();
       setNotifications([]);
     } catch { /* skip */ }
   };
 
-  const getNotificationIcon = (source: string, type: string) => {
-    if (source === "apc") return <ShieldAlert className="h-5 w-5 text-red-600" />;
-    if (source === "student") return <User className="h-5 w-5 text-blue-600" />;
-
+  const getNotificationIcon = (type: string) => {
     switch (type) {
-      case "success": return <CheckCircle className="h-5 w-5 text-green-600" />;
+      case "alert": return <AlertCircle className="h-5 w-5 text-red-600" />;
       case "warning": return <AlertCircle className="h-5 w-5 text-yellow-600" />;
+      case "success": return <CheckCircle className="h-5 w-5 text-green-600" />;
       case "interview_call": return <Bell className="h-5 w-5 text-indigo-600" />;
       case "queue_update": return <Clock className="h-5 w-5 text-blue-600" />;
-      case "status_update": return <Info className="h-5 w-5 text-purple-600" />;
+      case "query_reply": case "query_resolved": return <User className="h-5 w-5 text-purple-600" />;
       case "info": return <Info className="h-5 w-5 text-blue-600" />;
       default: return <Bell className="h-5 w-5 text-gray-600" />;
     }
   };
 
-  const getNotificationBadge = (source: string, type: string) => {
-    if (source === "apc") return <Badge className="bg-red-100 text-red-800 border-red-200 text-xs">APC</Badge>;
-    if (source === "student") return <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-xs">Student</Badge>;
-
+  const getNotificationBadge = (type: string) => {
     switch (type) {
+      case "alert": return <Badge className="bg-red-100 text-red-800 border-red-200 text-xs">Alert</Badge>;
+      case "warning": return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 text-xs">Warning</Badge>;
       case "interview_call": return <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200 text-xs">Interview</Badge>;
       case "queue_update": return <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-xs">Queue</Badge>;
-      case "status_update": return <Badge className="bg-purple-100 text-purple-800 border-purple-200 text-xs">Status</Badge>;
-      case "success": return <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">Success</Badge>;
-      case "warning": return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 text-xs">Alert</Badge>;
+      case "query_reply": case "query_resolved": return <Badge className="bg-purple-100 text-purple-800 border-purple-200 text-xs">Query</Badge>;
       case "info": return <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-xs">Info</Badge>;
       default: return <Badge className="bg-gray-100 text-gray-800 border-gray-200 text-xs">General</Badge>;
     }
@@ -150,16 +138,11 @@ export function CoCoNotificationsPage() {
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
-  const filteredNotifications = notifications.filter((n) => {
-    const matchesSearch =
-      n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      n.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (n.company && n.company.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (n.senderName && n.senderName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (n.senderRoll && n.senderRoll.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesFilter = selectedFilter === "all" || n.source === selectedFilter;
-    return matchesSearch && matchesFilter;
-  });
+  const filteredNotifications = notifications.filter((n) =>
+    n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    n.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (n.company && n.company.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
 
   if (loading) {
     return (
@@ -194,20 +177,10 @@ export function CoCoNotificationsPage() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col gap-2">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 h-9 text-sm" />
-        </div>
-        <Select value={selectedFilter} onValueChange={setSelectedFilter}>
-          <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Filter by source" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Sources</SelectItem>
-            <SelectItem value="student">Student</SelectItem>
-            <SelectItem value="apc">APC / Admin</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+        <Input placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 h-9 text-sm" />
       </div>
 
       {/* List */}
@@ -222,22 +195,16 @@ export function CoCoNotificationsPage() {
             <div
               key={notification.id}
               onClick={() => !notification.isRead && handleMarkRead(notification.id)}
-              className={`p-3 rounded-lg border transition-colors cursor-pointer ${!notification.isRead ? "border-green-300 bg-green-50 shadow-sm" : "border-gray-200 hover:bg-gray-50 bg-white"
+              className={`p-3 rounded-lg border transition-colors cursor-pointer ${!notification.isRead ? "border-indigo-300 bg-indigo-50 shadow-sm" : "border-gray-200 hover:bg-gray-50 bg-white"
                 }`}
             >
               <div className="flex items-start gap-3">
-                <div className="mt-1 flex-shrink-0">{getNotificationIcon(notification.source, notification.type)}</div>
+                <div className="mt-1 flex-shrink-0">{getNotificationIcon(notification.type)}</div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-semibold text-sm text-gray-900 truncate pr-2">{notification.title}</span>
-                    {getNotificationBadge(notification.source, notification.type)}
+                    {getNotificationBadge(notification.type)}
                   </div>
-
-                  {notification.source === "student" && notification.senderName && (
-                    <div className="text-xs font-medium text-gray-700 mb-1">
-                      From: {notification.senderName} {notification.senderRoll ? `(${notification.senderRoll})` : ""}
-                    </div>
-                  )}
 
                   {notification.company && (
                     <div className="flex items-center text-xs text-gray-600 mb-1">
@@ -252,7 +219,7 @@ export function CoCoNotificationsPage() {
                       <Clock className="h-3 w-3" /> {formatTimestamp(notification.timestamp)}
                     </div>
                     {!notification.isRead && (
-                      <Button variant="ghost" size="sm" className="h-6 text-[11px] text-green-700 hover:text-green-800 hover:bg-green-100 px-2" onClick={(e) => { e.stopPropagation(); handleMarkRead(notification.id); }}>
+                      <Button variant="ghost" size="sm" className="h-6 text-[11px] text-indigo-700 hover:text-indigo-800 hover:bg-indigo-100 px-2" onClick={(e) => { e.stopPropagation(); handleMarkRead(notification.id); }}>
                         Mark as Read
                       </Button>
                     )}
@@ -269,9 +236,12 @@ export function CoCoNotificationsPage() {
 
 function mapTypeToTitle(type?: string): string {
   switch (type) {
+    case "alert": return "Alert";
     case "interview_call": return "Interview Call";
     case "queue_update": return "Queue Update";
     case "status_update": return "Status Update";
+    case "query_reply": return "Query Reply";
+    case "query_resolved": return "Query Resolved";
     case "info": return "Information";
     case "warning": return "Warning";
     default: return "Notification";

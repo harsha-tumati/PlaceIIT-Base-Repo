@@ -10,6 +10,9 @@ const { getIO } = require("../config/socket");
 const crypto = require("crypto");
 const { createApc } = require("../services/apc.service");
 const Apc = require("../models/Apc.model");
+const DriveState = require("../models/DriveState.model");
+const Notification = require("../models/Notification.model");
+const { SOCKET_EVENTS } = require("../utils/constants");
 
 const emitStatsUpdate = async () => {
   try {
@@ -208,6 +211,10 @@ const addStudent = async (req, res) => {
     console.log("[addStudent] Request body:", JSON.stringify(req.body));
     const { name, rollNumber, email, phone } = req.body;
     if (!name || !rollNumber || !email || !phone) return res.status(400).json({ message: "Name, Roll Number, Email ID, and Phone Number are required" });
+    
+    // Validate phone number format (must be 10 digits)
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(phone)) return res.status(400).json({ message: "Phone number must be exactly 10 digits" });
 
     const instituteId = rollNumber;
     const finalEmail = email;
@@ -292,18 +299,14 @@ const addApc = async (req, res) => {
       return res.status(403).json({ message: "Only main admin can create APCs" });
     }
 
-    try {
-      const result = await createApc({ name, email, rollNumber, contact });
-      await emitStatsUpdate(); // optional: emit stats
-      res.status(201).json({ message: "APC added successfully and invitation email sent", ...result });
-    } catch (err) {
-      if (err.message.includes("Account created successfully, but welcome email failed")) {
-         await emitStatsUpdate();
-         res.status(201).json({ message: err.message });
-      } else {
-         throw err;
-      }
-    }
+    const result = await createApc({ name, email, rollNumber, contact });
+    await emitStatsUpdate();
+
+    const resMessage = result.emailSent
+      ? "APC added successfully"
+      : "APC added successfully (Warning: Welcome email could not be sent)";
+
+    res.status(201).json({ message: resMessage, ...result });
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
@@ -835,11 +838,133 @@ const respondToQuery = async (req, res) => {
   }
 };
 
+// @desc    Get current drive state (Day/Slot)
+// @route   GET /api/admin/drive-state
+const getDriveState = async (req, res) => {
+  try {
+    let state = await DriveState.findOne();
+    if (!state) {
+      state = await DriveState.create({ currentDay: 1, currentSlot: "morning" });
+    }
+    res.json(state);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// @desc    Update drive state (Day/Slot) — broadcasts to all users
+// @route   PUT /api/admin/drive-state
+const updateDriveState = async (req, res) => {
+  try {
+    const { day, slot } = req.body;
+    if (!day || !slot) return res.status(400).json({ message: "Day and Slot are required" });
+
+    let state = await DriveState.findOne();
+    if (!state) {
+      state = await DriveState.create({ currentDay: day, currentSlot: slot });
+    } else {
+      state.currentDay = day;
+      state.currentSlot = slot;
+      await state.save();
+    }
+
+    // Broadcast to ALL connected clients
+    try {
+      const io = getIO();
+      if (io) io.emit(SOCKET_EVENTS.DRIVE_STATE_UPDATED, { currentDay: day, currentSlot: slot });
+    } catch (_) {}
+
+    res.json(state);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// @desc    Send broadcast notification to students/cocos/everyone
+// @route   POST /api/admin/broadcast-notification
+const sendBroadcastNotification = async (req, res) => {
+  try {
+    const { message, type = "general", audience } = req.body;
+    if (!message) return res.status(400).json({ message: "Message is required" });
+    if (!audience) return res.status(400).json({ message: "Audience is required" });
+
+    // Build role filter based on audience
+    let roleFilter;
+    if (audience === "students") roleFilter = { role: "student" };
+    else if (audience === "cocos") roleFilter = { role: "coco" };
+    else roleFilter = { role: { $in: ["student", "coco"] } }; // everyone
+
+    const users = await User.find({ ...roleFilter, isActive: true }).select("_id");
+
+    const notificationService = require("../services/notification.service");
+    let sentCount = 0;
+    for (const user of users) {
+      await notificationService.sendNotification({
+        recipientId: user._id,
+        senderId: req.user.id,
+        source: "apc",
+        message,
+        type,
+      });
+      sentCount++;
+    }
+
+    res.json({ message: `Notification sent to ${sentCount} user(s)`, sentCount });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+// @desc    Get notifications for APC
+// @route   GET /api/admin/notifications
+const getApcNotifications = async (req, res) => {
+  try {
+    const notifications = await Notification.find({
+      recipientId: req.user.id,
+    })
+      .populate("senderId", "name rollNumber")
+      .populate("companyId", "name")
+      .sort({ createdAt: -1 })
+      .limit(50);
+    res.json(notifications);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// @desc    Mark a notification as read (APC)
+// @route   PUT /api/admin/notifications/:id/read
+const markApcNotifRead = async (req, res) => {
+  try {
+    const notif = await Notification.findOneAndUpdate(
+      { _id: req.params.id, recipientId: req.user.id },
+      { isRead: true },
+      { new: true }
+    );
+    if (!notif) return res.status(404).json({ message: "Notification not found" });
+    res.json(notif);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// @desc    Clear all notifications for APC
+// @route   DELETE /api/admin/notifications
+const clearAllApcNotifications = async (req, res) => {
+  try {
+    await Notification.deleteMany({ recipientId: req.user.id });
+    res.json({ message: "Notifications cleared" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 module.exports = {
   getStats, getCompanies, addCompany, updateCompany,
   searchStudents, getStudentCompanies, getCocos, addCoco, addStudent, getApcs, addApc, removeApc,
   assignCoco, removeCoco,
   uploadCompanyExcel, uploadShortlistExcel, uploadCocoExcel, uploadApcExcel, uploadStudentExcel, uploadCocoRequirementsExcel, getUploadStatus,
   shortlistStudents, getShortlistedStudents, autoAllocateCocos, getCocoConflicts,
-  getQueries, respondToQuery
+  getQueries, respondToQuery,
+  getDriveState, updateDriveState, sendBroadcastNotification,
+  getApcNotifications, markApcNotifRead, clearAllApcNotifications
 };
