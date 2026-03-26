@@ -1,6 +1,7 @@
 const User = require("../models/User.model");
 const Student = require("../models/Student.model");
 const Coordinator = require("../models/Coordinator.model");
+const Apc = require("../models/Apc.model");
 const { generateToken } = require("../utils/generateToken");
 const { ROLES } = require("../utils/constants");
 const { sendOtpEmail } = require("../services/email.service");
@@ -64,12 +65,14 @@ const getMe = async (req, res) => {
     let profile = null;
     if (user.role === ROLES.STUDENT) profile = await Student.findOne({ userId: user._id });
     else if (user.role === ROLES.COCO) profile = await Coordinator.findOne({ userId: user._id });
-    // APC profile could be added here if needed, but Student and Coordinator cover the main ones.
+    else if (user.role === ROLES.ADMIN) profile = await Apc.findOne({ userId: user._id });
 
     if (profile) {
       user.name = profile.name;
       user.contact = profile.contact || profile.phone;
       user.department = profile.department || profile.branch;
+    } else {
+      user.name = user.instituteId;
     }
 
     res.json(user);
@@ -243,4 +246,38 @@ const changePassword = async (req, res) => {
   }
 };
 
-module.exports = { login, getMe, register, sendOtp, verifyOtp, resetPassword, changePassword };
+// @desc    Update auth profile
+// @route   PUT /api/auth/profile
+// @access  Private
+const updateProfile = async (req, res) => {
+  try {
+    const { name, email, phone } = req.body;
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (email) user.email = email;
+    await user.save();
+
+    let profile = null;
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (phone) {
+      updateData.phone = phone;
+      updateData.contact = phone;
+    }
+    
+    if (user.role === ROLES.STUDENT) {
+      profile = await Student.findOneAndUpdate({ userId: user._id }, { ...updateData, userId: user._id }, { new: true, upsert: true });
+    } else if (user.role === ROLES.COCO) {
+      profile = await Coordinator.findOneAndUpdate({ userId: user._id }, { ...updateData, userId: user._id }, { new: true, upsert: true });
+    } else if (user.role === ROLES.ADMIN) {
+      profile = await Apc.findOneAndUpdate({ userId: user._id }, { ...updateData, userId: user._id }, { new: true, upsert: true });
+    }
+
+    res.json({ message: "Profile updated", name: profile ? profile.name : user.instituteId, email: user.email });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+module.exports = { login, getMe, register, sendOtp, verifyOtp, resetPassword, changePassword, updateProfile };

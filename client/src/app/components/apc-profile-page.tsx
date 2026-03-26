@@ -8,6 +8,7 @@ import { User, Mail, Phone, Lock, CheckCircle, AlertCircle, Loader2 } from "luci
 import { Alert, AlertDescription } from "@/app/components/ui/alert";
 import { authApi } from "@/app/lib/api";
 import { toast } from "sonner";
+import { useAuth } from "@/app/auth-context";
 
 interface APCProfilePageProps {
   userName: string;
@@ -15,6 +16,7 @@ interface APCProfilePageProps {
 }
 
 export function APCProfilePage({ userName, userId }: APCProfilePageProps) {
+  const { setUserName } = useAuth();
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -48,9 +50,16 @@ export function APCProfilePage({ userName, userId }: APCProfilePageProps) {
     window.scrollTo(0, 0);
   }, []);
 
-  const handleSaveProfile = () => {
-    toast.success("Profile updated successfully!");
-    setIsEditingProfile(false);
+  const handleSaveProfile = async () => {
+    try {
+      const res = await authApi.updateProfile({ name, email, phone });
+      toast.success(res.message || "Profile updated successfully!");
+      setUserName(res.name); // instantly update global navbar
+      setIsEditingProfile(false);
+      fetchProfile();
+    } catch (err: any) {
+      toast.error("Failed to update profile: " + (err.message ?? ""));
+    }
   };
 
   const handleChangePassword = (e: React.FormEvent) => {

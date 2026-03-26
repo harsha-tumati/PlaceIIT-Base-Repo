@@ -170,6 +170,10 @@ export function StudentDetailsPage({
               <span className="px-3 py-1.5 bg-yellow-100 text-yellow-800 text-sm font-semibold rounded-full border border-yellow-300">
                 In Interview
               </span>
+            ) : queuedFor ? (
+              <span className="px-3 py-1.5 bg-blue-100 text-blue-800 text-sm font-semibold rounded-full border border-blue-300">
+                In Queue
+              </span>
             ) : (
               <span className="px-3 py-1.5 bg-green-100 text-green-800 text-sm font-semibold rounded-full border border-green-300">
                 Available
@@ -225,6 +229,18 @@ export function StudentDetailsPage({
                 <div className="text-xs font-semibold text-yellow-700 uppercase tracking-wide mb-1">Current Interview</div>
                 <div className="font-medium text-gray-900">
                   Interviewing with {interviewWith} at {interviewVenue}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {queuedFor && !inInterview && (
+            <div className="flex items-start gap-3 bg-blue-50 p-4 rounded-lg border border-blue-200 mt-6">
+              <Clock className="h-5 w-5 text-blue-700 mt-0.5" />
+              <div className="flex-1">
+                <div className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-1">Queue Status</div>
+                <div className="font-medium text-gray-900">
+                  Waiting in queue for {queuedFor}
                 </div>
               </div>
             </div>

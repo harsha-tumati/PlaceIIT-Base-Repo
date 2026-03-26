@@ -17,7 +17,7 @@ const withQueueStatus = async (students) => {
     // Active is defined as IN_QUEUE or IN_INTERVIEW
     const activeQueues = await Queue.find({
         studentId: { $in: studentIds },
-        status: { $in: [STUDENT_STATUS.IN_QUEUE, STUDENT_STATUS.IN_INTERVIEW] }
+        status: { $in: [STUDENT_STATUS.PENDING, STUDENT_STATUS.IN_QUEUE, STUDENT_STATUS.IN_INTERVIEW] }
     }).populate("companyId", "name venue");
 
     // Create a map for fast lookup
@@ -41,7 +41,8 @@ const withQueueStatus = async (students) => {
                 s.inInterview = true;
                 s.interviewWith = q.companyId.name;
                 s.interviewVenue = q.companyId.venue || "TBA";
-            } else if (q.status === STUDENT_STATUS.IN_QUEUE) {
+            } else {
+                // Both PENDING and IN_QUEUE count as queuedFor
                 s.inInterview = false;
                 s.queuedFor = q.companyId.name;
             }

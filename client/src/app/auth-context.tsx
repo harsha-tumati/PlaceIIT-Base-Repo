@@ -20,6 +20,7 @@ interface AuthState {
     userRole: UserRole | null;
     userId: string;
     userName: string;
+    setUserName: (name: string) => void;
     token: string | null;
     login: (instituteId: string, password: string, role?: UserRole) => Promise<{ success: boolean; error?: string }>;
     logout: () => void;
@@ -64,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     setTokenState(stored);
                     setUserRole(serverRoleToClient(user.role));
                     setUserId(user._id);
-                    setUserName(user.instituteId);
+                    setUserName(user.name || user.instituteId);
                     setUserMustChangePassword(!!user.mustChangePassword);
                     setIsLoggedIn(true);
                 })
@@ -131,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 userRole,
                 userId,
                 userName,
+                setUserName,
                 token,
                 login,
                 logout,

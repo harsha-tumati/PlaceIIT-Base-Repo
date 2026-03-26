@@ -85,7 +85,13 @@ export const authApi = {
             body: JSON.stringify({ instituteId, password, role }),
         }),
 
-    getMe: () => request<{ _id: string; instituteId: string; role: string; email: string; mustChangePassword?: boolean }>("/auth/me"),
+    getMe: () => request<{ _id: string; instituteId: string; role: string; email: string; mustChangePassword?: boolean; name?: string }>("/auth/me"),
+
+    updateProfile: (data: { name?: string; email?: string; phone?: string }) =>
+        request<{ message: string; name: string; email: string }>("/auth/profile", {
+            method: "PUT",
+            body: JSON.stringify(data),
+        }),
 
     changePassword: (newPassword: string) =>
         request<{ message: string; user: any }>("/auth/change-password", {

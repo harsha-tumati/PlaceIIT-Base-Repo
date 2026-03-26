@@ -148,6 +148,32 @@ export function ManageCompaniesPage({ onCompanyClick }: ManageCompaniesPageProps
     }
   };
 
+  const handleUpdateDay = async (company: Company, newDayStr: string) => {
+    const dayNum = parseInt(newDayStr.replace("Day ", ""), 10);
+    if(isNaN(dayNum)) return;
+    
+    setCompanies((prev) => prev.map((c) => (c.id === company.id ? { ...c, day: newDayStr } : c)));
+    try {
+      await adminApi.updateCompany(company.id, { day: dayNum });
+      toast.success("Day updated");
+    } catch (err: any) {
+      toast.error("Failed to save day: " + (err.message ?? ""));
+      fetchCompanies();
+    }
+  };
+
+  const handleUpdateSlot = async (company: Company, newSlot: string) => {
+    const slotFormatted = newSlot.toLowerCase();
+    setCompanies((prev) => prev.map((c) => (c.id === company.id ? { ...c, slot: newSlot } : c)));
+    try {
+      await adminApi.updateCompany(company.id, { slot: slotFormatted });
+      toast.success("Slot updated");
+    } catch (err: any) {
+      toast.error("Failed to save slot: " + (err.message ?? ""));
+      fetchCompanies();
+    }
+  };
+
   const handleExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -397,11 +423,29 @@ export function ManageCompaniesPage({ onCompanyClick }: ManageCompaniesPageProps
                     <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
                       <div className="flex items-center gap-1.5">
                         <Calendar className="h-4 w-4" />
-                        <span>{company.day}</span>
+                        <Select value={company.day !== "—" ? company.day : undefined} onValueChange={(val) => handleUpdateDay(company, val)}>
+                          <SelectTrigger className="h-8 w-24 text-xs font-semibold bg-white border-gray-200">
+                            <SelectValue placeholder="Day" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+                              <SelectItem key={d} value={`Day ${d}`}>Day {d}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <Clock className="h-4 w-4" />
-                        <span>{company.slot}</span>
+                        <Select value={company.slot !== "—" ? company.slot : undefined} onValueChange={(val) => handleUpdateSlot(company, val)}>
+                          <SelectTrigger className="h-8 w-32 text-xs font-semibold bg-white border-gray-200">
+                            <SelectValue placeholder="Slot" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {["Morning", "Afternoon", "Evening", "Night"].map((s) => (
+                              <SelectItem key={s} value={s}>{s}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                   </div>
