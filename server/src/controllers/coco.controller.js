@@ -217,6 +217,7 @@ const assignPanelStudent = async (req, res) => {
 
     res.json(panel);
   } catch (err) {
+    console.error("[assignPanelStudent] Error:", err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -255,6 +256,7 @@ const clearPanel = async (req, res) => {
 
     res.json(panel);
   } catch (err) {
+    console.error("[clearPanel] Error:", err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -271,6 +273,7 @@ const getRounds = async (req, res) => {
       const fallbackRoundStr = `Round ${round.roundNumber}`;
       const queueEntries = await Queue.find({
         companyId: req.params.companyId,
+        status: { $ne: "pending" },
         $or: [
           { roundId: round._id },
           { round: roundNameStr },

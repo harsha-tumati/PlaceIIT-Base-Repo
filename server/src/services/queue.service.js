@@ -162,29 +162,70 @@ const switchAndJoin = async (studentId, fromCompanyId, fromRound, toCompanyId, t
   return entry;
 };
 
+const recalculateQueuePositions = async (companyId, round, roundId, removedPosition) => {
+  if (typeof removedPosition !== "number") return;
+
+  const scope = roundId ? { roundId } : { round };
+  const trailingEntries = await Queue.find({
+    companyId,
+    ...scope,
+    status: { $in: [STUDENT_STATUS.IN_QUEUE, STUDENT_STATUS.IN_INTERVIEW] },
+    position: { $gt: removedPosition },
+  }).sort({ position: 1 });
+
+  await Promise.all(trailingEntries.map((queuedStudent) => {
+    queuedStudent.position -= 1;
+    return queuedStudent.save();
+  }));
+};
+
 /* ─────────────────────────────────────────────────────────
-   leaveQueue — soft-delete (EXITED), does NOT delete record
+   leaveQueue — fully removes the active queue entry
 ─────────────────────────────────────────────────────────── */
 const leaveQueue = async (studentId, companyId, round = "Round 1") => {
-  const entry = await Queue.findOne({
+  const activeEntries = await Queue.find({
     companyId,
     studentId,
-    round,
     status: { $in: ACTIVE_STATUSES },
-  });
-  if (!entry) throw new Error("No active queue entry found for this company");
+  }).sort({ createdAt: -1 });
 
-  if (entry.status === STUDENT_STATUS.IN_INTERVIEW) {
+  const matchingEntries = activeEntries.filter((entry) => entry.round === round);
+  const entriesToRemove = matchingEntries.length > 0 ? matchingEntries : activeEntries;
+
+  if (entriesToRemove.length === 0) throw new Error("No active queue entry found for this company");
+
+  if (entriesToRemove.some((entry) => entry.status === STUDENT_STATUS.IN_INTERVIEW)) {
     throw new Error("Cannot exit queue while in an active interview. Actions are disabled.");
   }
 
-  entry.status = STUDENT_STATUS.EXITED;
-  entry.completedAt = new Date();
-  await entry.save();
+  const affectedScopes = entriesToRemove.map((entry) => ({
+    id: entry._id,
+    position: entry.position,
+    round: entry.round,
+    roundId: entry.roundId,
+  }));
+
+  await Queue.deleteMany({ _id: { $in: affectedScopes.map((entry) => entry.id) } });
+
+  for (const removedEntry of affectedScopes) {
+    await recalculateQueuePositions(
+      companyId,
+      removedEntry.round,
+      removedEntry.roundId,
+      removedEntry.position
+    );
+  }
 
   safeEmitTo(`company:${companyId}`, SOCKET_EVENTS.QUEUE_UPDATED, {
     companyId, action: "exited", studentId,
   });
+
+  const studentDoc = await Student.findById(studentId);
+  if (studentDoc) {
+    safeEmitTo(`user:${studentDoc.userId}`, SOCKET_EVENTS.STATUS_UPDATED, {
+      companyId, status: STUDENT_STATUS.NOT_JOINED,
+    });
+  }
 
   return { message: "Left queue successfully" };
 };
@@ -204,8 +245,16 @@ const acceptQueueRequest = async (studentId, companyId, round = "Round 1") => {
   // Resolve active Round
   const company = await Company.findById(companyId);
   const currentRoundNum = company?.currentRound || 1;
-  const activeRound = await InterviewRound.findOne({ companyId, roundNumber: currentRoundNum });
-  if (activeRound) entry.roundId = activeRound._id;
+  let activeRound = await InterviewRound.findOne({ companyId, roundNumber: currentRoundNum });
+  if (!activeRound) {
+    activeRound = await InterviewRound.create({
+      companyId,
+      roundNumber: currentRoundNum,
+      roundName: `Round ${currentRoundNum}`,
+    });
+  }
+  entry.roundId = activeRound._id;
+  entry.round = activeRound.roundName || `Round ${activeRound.roundNumber}`;
 
   // Assign position
   const lastEntry = await Queue.findOne({
@@ -216,6 +265,14 @@ const acceptQueueRequest = async (studentId, companyId, round = "Round 1") => {
   entry.position = (lastEntry?.position || 0) + 1;
   entry.status = STUDENT_STATUS.IN_QUEUE;
   await entry.save();
+
+  // Accepted students must become visible in company/student datasets.
+  await Company.findByIdAndUpdate(companyId, {
+    $addToSet: { shortlistedStudents: studentId },
+  });
+  await Student.findByIdAndUpdate(studentId, {
+    $addToSet: { shortlistedCompanies: companyId },
+  });
 
   const studentDoc = await Student.findById(studentId);
   safeEmitTo(`company:${companyId}`, SOCKET_EVENTS.QUEUE_UPDATED, {
