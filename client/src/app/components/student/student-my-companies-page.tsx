@@ -214,14 +214,8 @@ export function StudentMyCompaniesPage() {
       case "pending":
         return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200"><Clock3 className="h-3 w-3 mr-1" />Requested</Badge>;
       case "in_queue":
-        return <Badge className="bg-blue-100 text-blue-800 border-blue-200"><Users className="h-3 w-3 mr-1" />In Queue</Badge>;
       case "on_hold":
-        return (
-          <>
-            <Badge className="bg-blue-100 text-blue-800 border-blue-200"><Users className="h-3 w-3 mr-1" />In Queue</Badge>
-            <Badge className="bg-red-100 text-red-800 border-red-200"><Flag className="h-3 w-3 mr-1" />Flagged</Badge>
-          </>
-        );
+        return <Badge className="bg-blue-100 text-blue-800 border-blue-200"><Users className="h-3 w-3 mr-1" />In Queue</Badge>;
       case "in_interview":
         return <Badge className="bg-orange-100 text-orange-800 border-orange-200"><Mic className="h-3 w-3 mr-1" />Interviewing</Badge>;
       case "completed":
@@ -380,8 +374,22 @@ export function StudentMyCompaniesPage() {
     );
   }
 
+  const flaggedCompanies = companies.filter(c => c.queueStatus === "on_hold");
+
   return (
     <div className="space-y-6">
+      {flaggedCompanies.length > 0 && (
+        <div className="bg-red-50 border border-red-300 rounded-lg p-4 flex items-start gap-3 shadow-sm">
+          <AlertCircle className="h-6 w-6 text-red-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="text-red-800 font-bold text-lg mb-1">Queue Action Required: You have been flagged!</h3>
+            <p className="text-red-700">
+              The coordinator has flagged your absence for: <strong>{flaggedCompanies.map(c => c.name).join(", ")}</strong>. Please report to the venue immediately or exit the queue to allow others to proceed.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900 flex items-center">
