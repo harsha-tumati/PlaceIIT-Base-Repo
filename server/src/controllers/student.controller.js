@@ -363,8 +363,24 @@ const submitQuery = async (req, res) => {
 // @route   GET /api/student/queries
 const getMyQueries = async (req, res) => {
   try {
-    const queries = await Query.find({ studentUserId: req.user.id }).sort({ createdAt: -1 });
-    res.json(queries);
+    const Apc = require("../models/Apc.model");
+    const queries = await Query.find({ studentUserId: req.user.id })
+      .populate("respondedBy", "instituteId email")
+      .sort({ createdAt: -1 });
+    
+    // Attach APC responder name
+    const result = await Promise.all(
+      queries.map(async (q) => {
+        const queryObj = q.toObject();
+        if (q.respondedBy) {
+          const responderApc = await Apc.findOne({ userId: q.respondedBy._id });
+          queryObj.respondedByName = responderApc ? responderApc.name : "APC";
+        }
+        return queryObj;
+      })
+    );
+    
+    res.json(result);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -398,5 +414,5 @@ module.exports = {
   joinQueue, joinWalkIn, leaveQueue, confirmSwitch, getWalkIns, getQueuePosition,
   getNotifications, markNotifRead, markAllNotifRead, clearAllNotifications,
   submitQuery, getMyQueries,
-  uploadResume, downloadResume,
+  uploadResume, downloadResume
 };
