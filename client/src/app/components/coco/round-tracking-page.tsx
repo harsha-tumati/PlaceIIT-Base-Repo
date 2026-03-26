@@ -6,7 +6,7 @@ import { Badge } from "@/app/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/app/components/ui/dialog";
 import { Label } from "@/app/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
-import { ArrowLeft, UserPlus, Users, Clock, CheckCircle, AlertCircle, Upload, Loader2, Flag, PlayCircle } from "lucide-react";
+import { ArrowLeft, UserPlus, Users, Clock, CheckCircle, AlertCircle, Upload, Loader2, Flag, PlayCircle, Bell, XCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
 import { cocoApi } from "@/app/lib/api";
 import { useSocket } from "@/app/socket-context";
@@ -52,13 +52,15 @@ const StudentCard = ({
   index,
   isFlagged = false,
   onFlag,
-  onResume
+  onResume,
+  onComplete,
 }: {
   student: Student;
   index?: number;
   isFlagged?: boolean;
   onFlag?: (id: string) => void;
   onResume?: (id: string) => void;
+  onComplete?: (id: string) => void;
 }) => {
   return (
     <Card className={`mb-3 border-gray-200 transition-all ${isFlagged ? "bg-gray-50/50" : "hover:border-gray-300"}`}>
@@ -83,6 +85,12 @@ const StudentCard = ({
             {student.status === "in-queue" && !isFlagged && onFlag && (
               <Button size="sm" variant="ghost" className="h-6 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 mt-1" onClick={() => onFlag(student.id)}>
                 <Flag className="h-3 w-3 mr-1" /> Flag Absent
+              </Button>
+            )}
+
+            {student.status === "in-queue" && !isFlagged && onComplete && (
+              <Button size="sm" variant="ghost" className="h-6 text-xs text-green-600 hover:text-green-700 hover:bg-green-50 px-2 mt-1" onClick={() => onComplete(student.id)}>
+                <CheckCircle className="h-3 w-3 mr-1" /> Mark Done
               </Button>
             )}
 
@@ -112,6 +120,10 @@ export function RoundTrackingPage({ companyName, onBack }: RoundTrackingPageProp
   const [uploadingExcel, setUploadingExcel] = useState(false);
   const [excelRound, setExcelRound] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Pending requests state
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [pendingActionLoading, setPendingActionLoading] = useState<string | null>(null);
 
   // Manual Add states
   const [manualStatus, setManualStatus] = useState("yet-to-interview");
@@ -215,21 +227,49 @@ export function RoundTrackingPage({ companyName, onBack }: RoundTrackingPageProp
     }
   }, [companyName]);
 
+  const fetchPendingRequests = useCallback(async (cid: string) => {
+    if (!cid) return;
+    try {
+      const data: any = await cocoApi.getPendingRequests(cid);
+      setPendingRequests(Array.isArray(data) ? data : []);
+    } catch {
+      setPendingRequests([]);
+    }
+  }, []);
+
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Fetch pending requests whenever companyId is resolved
+  useEffect(() => {
+    if (companyId) fetchPendingRequests(companyId);
+  }, [companyId, fetchPendingRequests]);
 
   useEffect(() => {
     if (!socket || !companyId) return;
     socket.emit("join:company", companyId);
     const refresh = () => fetchData();
+
+    const handleQueueUpdated = (payload: any) => {
+      if (payload?.action === "pending_request") {
+        // Show COCO popup notification for incoming join request
+        toast.info(`New queue request from ${payload.studentName ?? "a student"}`, {
+          description: "Check the Pending Requests section to accept or reject.",
+          duration: 6000,
+        });
+      }
+      refresh();
+      fetchPendingRequests(companyId);
+    };
+
     socket.on("status:updated", refresh);
     socket.on("round:updated", refresh);
-    socket.on("queue:updated", refresh);
+    socket.on("queue:updated", handleQueueUpdated);
     return () => {
       socket.off("status:updated", refresh);
       socket.off("round:updated", refresh);
-      socket.off("queue:updated", refresh);
+      socket.off("queue:updated", handleQueueUpdated);
     };
-  }, [socket, companyId, fetchData]);
+  }, [socket, companyId, fetchData, fetchPendingRequests]);
 
   const handleManualAdd = async () => {
     if (!selectedStudent) return toast.error("Please explicitly select a student from the dropdown list");
@@ -248,7 +288,8 @@ export function RoundTrackingPage({ companyName, onBack }: RoundTrackingPageProp
         await cocoApi.updateStudentStatus({
           studentId: student._id || student.id,
           companyId,
-          status: manualStatus === 'yet-to-interview' ? 'in_interview' : (manualStatus === 'on-hold' ? 'on_hold' : manualStatus)
+          status: manualStatus === 'yet-to-interview' ? 'in_interview' : (manualStatus === 'on-hold' ? 'on_hold' : manualStatus),
+          round: `Round ${excelRound}`
         });
       }
 
@@ -288,13 +329,9 @@ export function RoundTrackingPage({ companyName, onBack }: RoundTrackingPageProp
     }
   };
 
-  const handleFlagAbsent = async (studentId: string) => {
+  const handleFlagAbsent = async (student: Student) => {
     try {
-      await cocoApi.updateStudentStatus({
-        studentId,
-        companyId,
-        status: 'on_hold'
-      });
+      await cocoApi.updateStudentStatus({ studentId: student.id, companyId, status: 'on_hold', round: `Round ${student.round}` });
       toast.success("Student flagged as absent.", { description: "They have been temporarily skipped." });
       fetchData();
     } catch {
@@ -302,17 +339,52 @@ export function RoundTrackingPage({ companyName, onBack }: RoundTrackingPageProp
     }
   };
 
-  const handleResumeQueue = async (studentId: string) => {
+  const handleResumeQueue = async (student: Student) => {
     try {
-      await cocoApi.updateStudentStatus({
-        studentId,
-        companyId,
-        status: 'in_queue'
-      });
+      await cocoApi.updateStudentStatus({ studentId: student.id, companyId, status: 'in_queue', round: `Round ${student.round}` });
       toast.success("Student resumed in queue!", { description: "Their original queue order has been restored." });
       fetchData();
     } catch {
       toast.error("Failed to resume student.");
+    }
+  };
+
+  const handleMarkCompleted = async (student: Student) => {
+    try {
+      await cocoApi.markCompleted({ studentId: student.id, companyId, round: `Round ${student.round}` });
+      toast.success("Student marked as completed!");
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to mark as completed");
+    }
+  };
+
+  const handleAcceptRequest = async (entry: any) => {
+    const studentId = entry.studentId?._id ?? entry.studentId;
+    setPendingActionLoading(studentId);
+    try {
+      await cocoApi.acceptStudent({ studentId, companyId, round: entry.round });
+      toast.success("Student accepted into the queue!");
+      await fetchPendingRequests(companyId);
+      await fetchData();
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to accept student");
+    } finally {
+      setPendingActionLoading(null);
+    }
+  };
+
+  const handleRejectRequest = async (entry: any) => {
+    const studentId = entry.studentId?._id ?? entry.studentId;
+    setPendingActionLoading(studentId);
+    try {
+      await cocoApi.rejectStudent({ studentId, companyId, round: entry.round });
+      toast.success("Request rejected.");
+      await fetchPendingRequests(companyId);
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to reject student");
+    } finally {
+      setPendingActionLoading(null);
     }
   };
 
@@ -346,10 +418,10 @@ export function RoundTrackingPage({ companyName, onBack }: RoundTrackingPageProp
             <div className="text-center py-5 text-xs text-gray-400 border border-dashed rounded-lg bg-gray-50/50">Empty</div>
           )}
           {inQueueActive.map((s, idx) => (
-            <StudentCard key={s.id} student={s} index={idx} onFlag={handleFlagAbsent} />
+            <StudentCard key={s.id} student={s} index={idx} onFlag={() => handleFlagAbsent(s)} onComplete={() => handleMarkCompleted(s)} />
           ))}
           {inQueueFlagged.map((s) => (
-            <StudentCard key={s.id} student={s} isFlagged onResume={handleResumeQueue} />
+            <StudentCard key={s.id} student={s} isFlagged onResume={() => handleResumeQueue(s)} />
           ))}
 
           {/* Yet to Interview */}
@@ -527,6 +599,57 @@ export function RoundTrackingPage({ companyName, onBack }: RoundTrackingPageProp
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Pending Requests Panel */}
+      {pendingRequests.length > 0 && (
+        <Card className="bg-yellow-50 border-yellow-200 shrink-0">
+          <CardHeader className="py-3 border-b border-yellow-200">
+            <CardTitle className="text-base flex items-center gap-2 text-yellow-800">
+              <Bell className="h-4 w-4" />
+              Pending Join Requests ({pendingRequests.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {pendingRequests.map((entry: any) => {
+                const student = entry.studentId ?? {};
+                const sid = student._id ?? entry.studentId;
+                const isActioning = pendingActionLoading === String(sid);
+                return (
+                  <div key={entry._id} className="flex items-center justify-between bg-white rounded-lg border border-yellow-200 px-4 py-3 shadow-sm">
+                    <div>
+                      <p className="font-semibold text-sm text-gray-900">{student.name ?? "—"}</p>
+                      <p className="text-xs text-gray-500">{student.rollNumber ?? ""}</p>
+                      {entry.isWalkIn && <span className="text-xs text-green-600 font-medium">Walk-in</span>}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 h-7 px-2 text-xs"
+                        onClick={() => handleAcceptRequest(entry)}
+                        disabled={isActioning}
+                      >
+                        {isActioning ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3 mr-1" />}
+                        Accept
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-red-600 border-red-300 hover:bg-red-50 h-7 px-2 text-xs"
+                        onClick={() => handleRejectRequest(entry)}
+                        disabled={isActioning}
+                      >
+                        {isActioning ? <Loader2 className="h-3 w-3 animate-spin" /> : <XCircle className="h-3 w-3 mr-1" />}
+                        Reject
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex flex-1 overflow-x-auto min-h-0 pt-2 pb-4 scroll-smooth">
         <div className="flex flex-1 w-full gap-6">

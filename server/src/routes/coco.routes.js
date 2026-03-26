@@ -10,6 +10,7 @@ const {
   searchAllStudents, addStudentToRound, uploadStudentsToRound,
   getCocoNotifications, markNotifRead, clearAllNotifications, addStudentToCompany,
   promoteStudentsViaExcel,
+  getPendingRequests, acceptStudent, rejectStudent, markCompleted,
 } = require("../controllers/coco.controller");
 const { getStudentCompanies } = require("../controllers/admin.controller");
 const { protect } = require("../middlewares/auth.middleware");
@@ -21,9 +22,13 @@ router.get("/company", getAssignedCompany);
 router.get("/company/:companyId/students", getShortlistedStudents);
 router.get("/company/:companyId/rounds", getRounds);
 router.get("/company/:companyId/panels", getPanels);
+router.get("/company/:companyId/pending", getPendingRequests);
 router.put("/company/:companyId/walkin", toggleWalkIn);
 router.post("/queue/add", addStudentToQueue);
 router.put("/queue/status", updateStudentStatus);
+router.put("/queue/accept", acceptStudent);
+router.put("/queue/reject", rejectStudent);
+router.put("/queue/complete", markCompleted);
 router.post("/notify", sendNotification);
 router.get("/notifications/predefined", getPredefinedNotifications);
 router.get("/notifications", getCocoNotifications);

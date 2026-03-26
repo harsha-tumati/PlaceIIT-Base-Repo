@@ -110,75 +110,122 @@ const getMyCompanies = async (req, res) => {
 
     const allCompanies = sorted;
 
-    // Attach queue info for each company
+    // Attach queue info for each company and expand into distinct round tiles
     const result = await Promise.all(
       allCompanies.map(async (company) => {
-        const queueEntry = await Queue.findOne({
+        const queueEntries = await Queue.find({
           companyId: company._id,
           studentId: student._id,
         });
-        const totalInQueue = await Queue.countDocuments({
-          companyId: company._id,
-          status: "in_queue",
-        });
-        let liveQueueEntry = queueEntry ? queueEntry.toObject() : null;
-        if (liveQueueEntry && liveQueueEntry.status === "in_queue") {
-          const ahead = await Queue.countDocuments({
-            companyId: company._id,
-            status: "in_queue",
-            position: { $lt: liveQueueEntry.position },
-          });
-          liveQueueEntry = { ...liveQueueEntry, position: ahead + 1 };
+
+        if (queueEntries.length === 0) {
+          return [{
+            ...company,
+            round: "Round 1",
+            queueEntry: null,
+            totalInQueue: await Queue.countDocuments({ companyId: company._id, status: "in_queue", round: "Round 1" })
+          }];
         }
-        return { ...company, queueEntry: liveQueueEntry, totalInQueue };
+
+        const tiles = await Promise.all(queueEntries.map(async (entry) => {
+          let liveQueueEntry = entry.toObject();
+          const roundStr = entry.round || "Round 1";
+          const totalInQueue = await Queue.countDocuments({ companyId: company._id, status: "in_queue", round: roundStr });
+
+          if (liveQueueEntry.status === "in_queue") {
+            const ahead = await Queue.countDocuments({
+              companyId: company._id,
+              status: "in_queue",
+              round: roundStr,
+              position: { $lt: liveQueueEntry.position },
+            });
+            liveQueueEntry.position = ahead + 1;
+          }
+          return { ...company, round: roundStr, queueEntry: liveQueueEntry, totalInQueue };
+        }));
+
+        return tiles;
       })
     );
 
-    res.json(result);
+    res.json(result.flat());
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// @desc    Join queue for a company
+// @desc    Join queue for a company (creates PENDING entry, requires COCO approval)
 // @route   POST /api/student/queue/join
 const joinQueue = async (req, res) => {
   try {
-    const { companyId } = req.body;
+    const { companyId, round = "Round 1" } = req.body;
     const student = await Student.findOne({ userId: req.user.id });
     if (!student) return res.status(404).json({ message: "Student not found" });
 
-    const result = await queueService.joinQueue(student._id, companyId, false);
+    const result = await queueService.joinQueue(student._id, companyId, round, false);
     res.json(result);
   } catch (err) {
+    if (err.code === "QUEUE_CONFLICT") {
+      return res.status(409).json({
+        message: err.message,
+        code: "QUEUE_CONFLICT",
+        conflictCompanyId: err.conflictCompanyId,
+        conflictCompanyName: err.conflictCompanyName,
+        conflictRound: err.conflictRound,
+      });
+    }
     res.status(400).json({ message: err.message });
   }
 };
 
-// @desc    Join walk-in queue
+// @desc    Join walk-in queue (creates PENDING entry)
 // @route   POST /api/student/queue/walkin
 const joinWalkIn = async (req, res) => {
   try {
-    const { companyId } = req.body;
+    const { companyId, round = "Round 1" } = req.body;
     const student = await Student.findOne({ userId: req.user.id });
     if (!student) return res.status(404).json({ message: "Student not found" });
 
-    const result = await queueService.joinQueue(student._id, companyId, true);
+    const result = await queueService.joinQueue(student._id, companyId, round, true);
+    res.json(result);
+  } catch (err) {
+    if (err.code === "QUEUE_CONFLICT") {
+      return res.status(409).json({
+        message: err.message,
+        code: "QUEUE_CONFLICT",
+        conflictCompanyId: err.conflictCompanyId,
+        conflictCompanyName: err.conflictCompanyName,
+        conflictRound: err.conflictRound,
+      });
+    }
+    res.status(400).json({ message: err.message });
+  }
+};
+
+// @desc    Leave queue for a company (sets status to EXITED — does NOT delete)
+// @route   POST /api/student/queue/leave
+const leaveQueue = async (req, res) => {
+  try {
+    const { companyId, round = "Round 1" } = req.body;
+    const student = await Student.findOne({ userId: req.user.id });
+    if (!student) return res.status(404).json({ message: "Student not found" });
+
+    const result = await queueService.leaveQueue(student._id, companyId, round);
     res.json(result);
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
 };
 
-// @desc    Leave queue for a company
-// @route   POST /api/student/queue/leave
-const leaveQueue = async (req, res) => {
+// @desc    Confirm queue switch (exit old queue, create PENDING for new company)
+// @route   POST /api/student/queue/confirm-switch
+const confirmSwitch = async (req, res) => {
   try {
-    const { companyId } = req.body;
+    const { fromCompanyId, fromRound = "Round 1", toCompanyId, toRound = "Round 1", isWalkIn = false } = req.body;
     const student = await Student.findOne({ userId: req.user.id });
     if (!student) return res.status(404).json({ message: "Student not found" });
 
-    const result = await queueService.leaveQueue(student._id, companyId);
+    const result = await queueService.switchAndJoin(student._id, fromCompanyId, fromRound, toCompanyId, toRound, isWalkIn);
     res.json(result);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -194,28 +241,41 @@ const getWalkIns = async (req, res) => {
 
     const result = await Promise.all(
       companies.map(async (c) => {
-        const totalInQueue = await Queue.countDocuments({
-          companyId: c._id,
-          status: "in_queue",
-        });
-        const queueEntry = student
-          ? await Queue.findOne({ companyId: c._id, studentId: student._id })
-          : null;
-        let liveQueueEntry = queueEntry ? queueEntry.toObject() : null;
-        if (liveQueueEntry && liveQueueEntry.status === "in_queue") {
-          const ahead = await Queue.countDocuments({
-            companyId: c._id,
-            status: "in_queue",
-            position: { $lt: liveQueueEntry.position },
-          });
-          liveQueueEntry = { ...liveQueueEntry, position: ahead + 1 };
+        const queueEntries = student ? await Queue.find({ companyId: c._id, studentId: student._id }) : [];
+
+        if (queueEntries.length === 0) {
+          return [{
+            ...c.toObject(),
+            round: "Round 1",
+            queueEntry: null,
+            totalInQueue: await Queue.countDocuments({ companyId: c._id, status: "in_queue", round: "Round 1" })
+          }];
         }
-        return { ...c.toObject(), totalInQueue, queueEntry: liveQueueEntry };
+
+        const tiles = await Promise.all(queueEntries.map(async (entry) => {
+          let liveQueueEntry = entry.toObject();
+          const roundStr = entry.round || "Round 1";
+          const totalInQueue = await Queue.countDocuments({ companyId: c._id, status: "in_queue", round: roundStr });
+
+          if (liveQueueEntry.status === "in_queue") {
+            const ahead = await Queue.countDocuments({
+              companyId: c._id,
+              status: "in_queue",
+              round: roundStr,
+              position: { $lt: liveQueueEntry.position },
+            });
+            liveQueueEntry.position = ahead + 1;
+          }
+          return { ...c.toObject(), round: roundStr, queueEntry: liveQueueEntry, totalInQueue };
+        }));
+
+        return tiles;
       })
     );
 
+    const flatResult = result.flat();
     const terminalStatuses = ["completed", "offer_given", "rejected"];
-    const filteredResult = result.filter(
+    const filteredResult = flatResult.filter(
       (c) => !c.queueEntry || !terminalStatuses.includes(c.queueEntry.status)
     );
 
@@ -229,10 +289,12 @@ const getWalkIns = async (req, res) => {
 // @route   GET /api/student/queue/:companyId
 const getQueuePosition = async (req, res) => {
   try {
+    const { round = "Round 1" } = req.query;
     const student = await Student.findOne({ userId: req.user.id });
     const entry = await Queue.findOne({
       companyId: req.params.companyId,
       studentId: student._id,
+      round,
     });
     if (!entry) return res.json({ inQueue: false });
 
@@ -326,7 +388,7 @@ const clearAllNotifications = async (req, res) => {
 
 module.exports = {
   getProfile, updateProfile, getMyCompanies,
-  joinQueue, joinWalkIn, leaveQueue, getWalkIns, getQueuePosition,
+  joinQueue, joinWalkIn, leaveQueue, confirmSwitch, getWalkIns, getQueuePosition,
   getNotifications, markNotifRead, markAllNotifRead, clearAllNotifications,
   submitQuery, getMyQueries,
   uploadResume, downloadResume,
