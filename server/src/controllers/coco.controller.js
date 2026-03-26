@@ -203,11 +203,17 @@ const assignPanelStudent = async (req, res) => {
       queueEntry.panelId = panel._id;
       queueEntry.interviewStartedAt = new Date();
       await queueEntry.save();
+      studentDoc = queueEntry.studentId;
     }
 
     const { getIO } = require("../config/socket");
     const io = getIO();
-    if (io) io.to(panel.companyId.toString()).emit("queue:updated");
+    if (io) {
+      io.to(`company:${panel.companyId}`).emit("queue:updated", { companyId: panel.companyId });
+      if (studentDoc && studentDoc.userId) {
+        io.to(`user:${studentDoc.userId}`).emit("status:updated", { companyId: panel.companyId, status: "in_interview" });
+      }
+    }
 
     res.json(panel);
   } catch (err) {
@@ -222,6 +228,7 @@ const clearPanel = async (req, res) => {
     const panel = await Panel.findById(req.params.id).populate("roundId");
     if (!panel) return res.status(404).json({ message: "Panel not found" });
 
+    let studentDoc = null;
     if (panel.currentStudent) {
       const roundNameStr = panel.roundId ? (panel.roundId.roundName || `Round ${panel.roundId.roundNumber}`) : "Round 1";
       let queueEntry = await Queue.findOne({ studentId: panel.currentStudent, companyId: panel.companyId, round: roundNameStr }).sort({ createdAt: -1 });
@@ -229,6 +236,7 @@ const clearPanel = async (req, res) => {
         queueEntry.status = "completed";
         queueEntry.completedAt = new Date();
         await queueEntry.save();
+        studentDoc = queueEntry.studentId;
       }
     }
 
@@ -238,7 +246,12 @@ const clearPanel = async (req, res) => {
 
     const { getIO } = require("../config/socket");
     const io = getIO();
-    if (io) io.to(panel.companyId.toString()).emit("queue:updated");
+    if (io) {
+      io.to(`company:${panel.companyId}`).emit("queue:updated", { companyId: panel.companyId });
+      if (studentDoc && studentDoc.userId) {
+        io.to(`user:${studentDoc.userId}`).emit("status:updated", { companyId: panel.companyId, status: "completed" });
+      }
+    }
 
     res.json(panel);
   } catch (err) {
