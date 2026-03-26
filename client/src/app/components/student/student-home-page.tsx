@@ -231,7 +231,12 @@ export function StudentHomePage() {
       case "pending": return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200"><Clock3 className="h-3 w-3 mr-1" />Requested</Badge>;
       case "in_queue":
       case "in-queue": return <Badge className="bg-blue-100 text-blue-800 border-blue-200"><Users className="h-3 w-3 mr-1" />In Queue</Badge>;
-      case "on_hold": return <Badge className="bg-red-100 text-red-800 border-red-200"><Flag className="h-3 w-3 mr-1" />Flagged</Badge>;
+      case "on_hold": return (
+        <>
+          <Badge className="bg-blue-100 text-blue-800 border-blue-200"><Users className="h-3 w-3 mr-1" />In Queue</Badge>
+          <Badge className="bg-red-100 text-red-800 border-red-200"><Flag className="h-3 w-3 mr-1" />Flagged</Badge>
+        </>
+      );
       case "in_interview": return <Badge className="bg-orange-100 text-orange-800 border-orange-200"><Mic className="h-3 w-3 mr-1" />Interviewing</Badge>;
       case "completed":
       case "offer_given": return <Badge className="bg-green-100 text-green-800 border-green-200"><CheckCircle className="h-3 w-3 mr-1" />Completed</Badge>;
@@ -245,8 +250,8 @@ export function StudentHomePage() {
     switch (status) {
       case "pending": return "border-yellow-300 bg-yellow-50/40 shadow-sm";
       case "in_queue":
-      case "in-queue": return "border-blue-300 bg-blue-50/40 shadow-sm";
-      case "on_hold": return "border-red-300 bg-red-50/20 shadow-sm";
+      case "in-queue":
+      case "on_hold": return "border-blue-300 bg-blue-50/40 shadow-sm";
       case "in_interview": return "border-orange-300 bg-orange-50/30 shadow-sm";
       case "completed":
       case "offer_given": return "border-green-300 bg-green-50/30 shadow-sm";
