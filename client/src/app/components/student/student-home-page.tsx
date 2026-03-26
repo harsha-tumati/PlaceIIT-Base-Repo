@@ -10,8 +10,19 @@ import {
 
 import {
   Search, Building2, MapPin, Clock, Users, CheckCircle,
-  AlertCircle, Loader2, Mic, LogIn, LogOut, Clock3, XCircle
+  AlertCircle, Loader2, Mic, LogIn, LogOut, Clock3, XCircle, Flag
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/app/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
 import { studentApi } from "@/app/lib/api";
 import { useSocket } from "@/app/socket-context";
@@ -36,7 +47,7 @@ interface Company {
 }
 
 const CAN_JOIN = [null, "not_joined", "exited", "rejected", "upcoming"];
-const CAN_EXIT = ["in_queue", "in-queue", "in_interview"];
+const CAN_EXIT = ["in_queue", "in-queue", "in_interview", "on_hold"];
 
 export function StudentHomePage() {
   const { socket } = useSocket();
@@ -47,6 +58,10 @@ export function StudentHomePage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const walkinRef = useRef<HTMLDivElement>(null);
+
+  // Drive state
+  const [driveDay, setDriveDay] = useState<number | null>(null);
+  const [driveSlot, setDriveSlot] = useState<string | null>(null);
 
   const [switchModal, setSwitchModal] = useState<{
     fromCompanyId: string;
@@ -109,6 +124,14 @@ export function StudentHomePage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Fetch drive state
+  useEffect(() => {
+    studentApi.getDriveState().then((data: any) => {
+      setDriveDay(data.currentDay ?? null);
+      setDriveSlot(data.currentSlot ?? null);
+    }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (!socket) return;
     const refresh = () => fetchData();
@@ -121,6 +144,17 @@ export function StudentHomePage() {
       socket.off("walkin:updated", refresh);
     };
   }, [socket, fetchData]);
+
+  // Drive state socket sync
+  useEffect(() => {
+    if (!socket) return;
+    const handleDriveUpdate = (data: any) => {
+      setDriveDay(data.currentDay);
+      setDriveSlot(data.currentSlot);
+    };
+    socket.on("driveState:updated", handleDriveUpdate);
+    return () => { socket.off("driveState:updated", handleDriveUpdate); };
+  }, [socket]);
 
   const optimisticUpdate = (companyId: string, round: string, newStatus: string | null) => {
     setCompanies(prev => prev.map(c => (c.id === companyId && c.round === round) ? { ...c, queueStatus: newStatus } : c));
@@ -203,7 +237,8 @@ export function StudentHomePage() {
     switch (status) {
       case "pending": return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200"><Clock3 className="h-3 w-3 mr-1" />Requested</Badge>;
       case "in_queue":
-      case "in-queue": return <Badge className="bg-blue-100 text-blue-800 border-blue-200"><Users className="h-3 w-3 mr-1" />In Queue</Badge>;
+      case "in-queue":
+      case "on_hold": return <Badge className="bg-blue-100 text-blue-800 border-blue-200"><Users className="h-3 w-3 mr-1" />In Queue</Badge>;
       case "in_interview": return <Badge className="bg-orange-100 text-orange-800 border-orange-200"><Mic className="h-3 w-3 mr-1" />Interviewing</Badge>;
       case "completed":
       case "offer_given": return <Badge className="bg-green-100 text-green-800 border-green-200"><CheckCircle className="h-3 w-3 mr-1" />Completed</Badge>;
@@ -217,7 +252,8 @@ export function StudentHomePage() {
     switch (status) {
       case "pending": return "border-yellow-300 bg-yellow-50/40 shadow-sm";
       case "in_queue":
-      case "in-queue": return "border-blue-300 bg-blue-50/40 shadow-sm";
+      case "in-queue":
+      case "on_hold": return "border-blue-300 bg-blue-50/40 shadow-sm";
       case "in_interview": return "border-orange-300 bg-orange-50/30 shadow-sm";
       case "completed":
       case "offer_given": return "border-green-300 bg-green-50/30 shadow-sm";
@@ -269,14 +305,31 @@ export function StudentHomePage() {
                   <div className="flex items-center text-sm font-medium text-yellow-700 bg-yellow-50 border border-yellow-300 rounded-md h-9 px-3">
                     <Clock3 className="h-4 w-4 mr-1" />Requested
                   </div>
-                  <Button size="sm" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50 h-9 px-3"
-                    onClick={() => handleLeaveQueue(company)} disabled={busy}>
-                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4 mr-1" />}
-                    Cancel
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button size="sm" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50 h-9 px-3" disabled={busy}>
+                        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4 mr-1" />}
+                        Cancel
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Cancel Queue Request?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to cancel your queue request for {company.name}?
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>No, keep it</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleLeaveQueue(company)} className="bg-red-600 focus:ring-red-600 hover:bg-red-700">
+                          Yes, cancel request
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               )}
-              {(s === "in_queue" || s === "in-queue") && (
+              {(s === "in_queue" || s === "in-queue" || s === "on_hold") && (
                 <div className="flex items-center gap-3">
                   <div className="flex flex-col items-center bg-blue-50 border border-blue-200 rounded-md px-3 py-1 mr-2">
                     <span className="text-[10px] uppercase font-bold text-blue-600 tracking-wider">Position</span>
@@ -284,10 +337,27 @@ export function StudentHomePage() {
                       {company.queuePosition ? `#${company.queuePosition}` : "—"}
                     </span>
                   </div>
-                  <Button size="sm" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50 min-w-[110px] h-10"
-                    onClick={() => handleLeaveQueue(company)} disabled={busy}>
-                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><LogOut className="h-4 w-4 mr-1" />Exit Queue</>}
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button size="sm" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50 min-w-[110px] h-10" disabled={busy}>
+                        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><LogOut className="h-4 w-4 mr-1" />Exit Queue</>}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Exit Queue?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to leave the queue for {company.name}? You will lose your current position.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleLeaveQueue(company)} className="bg-red-600 focus:ring-red-600 hover:bg-red-700">
+                          Yes, leave queue
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               )}
               {s === "in_interview" && (
@@ -322,13 +392,22 @@ export function StudentHomePage() {
     );
   };
 
-  const currentDay = companies.length > 0 ? [...new Set(companies.map((c) => c.day))][0] : "Today";
+  const currentDay = driveDay ? `Day ${driveDay}` : (companies.length > 0 ? [...new Set(companies.map((c) => c.day))][0] : "Today");
   const sortedCompanies = [...companies].sort((a, b) => a.priority - b.priority);
-  const filteredCompanies = sortedCompanies.filter((c) => (
+
+  // Filter by active drive state day/slot
+  const activeCompanies = sortedCompanies.filter((c) => {
+    if (driveDay != null && c.day !== `Day ${driveDay}`) return false;
+    if (driveSlot && c.slot !== driveSlot) return false;
+    return true;
+  });
+
+  const filteredCompanies = activeCompanies.filter((c) => (
     (c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.role.toLowerCase().includes(searchQuery.toLowerCase())) &&
     (selectedRound === "all" || c.round === selectedRound)
   ));
   const uniqueRounds = [...new Set([...companies, ...walkinCompanies].map((c) => c.round))].filter(Boolean).sort((a, b) => a.localeCompare(b));
+  const flaggedCompanies = [...companies, ...walkinCompanies].filter(c => c.queueStatus === "on_hold");
 
   if (loading) {
     return (
@@ -340,9 +419,27 @@ export function StudentHomePage() {
 
   return (
     <div className="space-y-6">
+      {flaggedCompanies.length > 0 && (
+        <div className="bg-red-50 border border-red-300 rounded-lg p-4 flex items-start gap-3 shadow-sm">
+          <AlertCircle className="h-6 w-6 text-red-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="text-red-800 font-bold text-lg mb-1">Queue Action Required: You have been flagged!</h3>
+            <p className="text-red-700">
+              The coordinator has flagged your absence for: <strong>{flaggedCompanies.map(c => c.name).join(", ")}</strong>. Please report to the venue immediately.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold text-gray-900 flex items-center">
-          <Building2 className="h-6 w-6 mr-2 text-indigo-600" /> {currentDay}
+        <h2 className="text-2xl font-semibold text-gray-900 flex items-center gap-3">
+          <Building2 className="h-6 w-6 text-indigo-600" />
+          {currentDay}
+          {driveSlot && (
+            <Badge className="bg-indigo-100 text-indigo-700 border border-indigo-200 text-sm font-medium">
+              {driveSlot.charAt(0).toUpperCase() + driveSlot.slice(1)} Slot
+            </Badge>
+          )}
         </h2>
         <Button variant="outline" onClick={scrollToWalkin} className="border-green-600 text-green-600 hover:bg-green-50">
           <Building2 className="h-4 w-4 mr-2" /> Walk-in Companies
@@ -387,15 +484,22 @@ export function StudentHomePage() {
           Walk-in Companies
           <Badge className="ml-3 bg-green-100 text-green-800">Open for All</Badge>
         </h2>
-        {walkinCompanies.length === 0 ? (
+        {(() => {
+          const activeWalkins = walkinCompanies.filter((c) => {
+            if (driveDay != null && c.day !== `Day ${driveDay}`) return false;
+            if (driveSlot && c.slot !== driveSlot) return false;
+            return true;
+          });
+          return activeWalkins.length === 0 ? (
           <Card className="bg-gray-50">
             <CardContent className="py-8 text-center text-gray-500">No walk-in companies available right now.</CardContent>
           </Card>
         ) : (
           <div className="grid gap-6 md:grid-cols-2">
-            {walkinCompanies.map(renderCompanyCard)}
+            {activeWalkins.map(renderCompanyCard)}
           </div>
-        )}
+        );
+        })()}
       </div>
 
       <Dialog open={!!switchModal} onOpenChange={() => setSwitchModal(null)}>

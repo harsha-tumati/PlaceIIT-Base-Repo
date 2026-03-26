@@ -9,8 +9,19 @@ import {
 } from "@/app/components/ui/dialog";
 import {
   Building2, MapPin, Clock, CheckCircle, AlertCircle, Calendar,
-  Search, Loader2, Users, Mic, LogIn, LogOut, Clock3, XCircle,
+  Search, Loader2, Users, Mic, LogIn, LogOut, Clock3, XCircle, Flag,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/app/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
 import { studentApi } from "@/app/lib/api";
 import { useSocket } from "@/app/socket-context";
@@ -35,7 +46,7 @@ interface Company {
 // Statuses that allow clicking Join Queue
 const CAN_JOIN = [null, "not_joined", "exited", "rejected"];
 // Statuses that show Exit Queue button
-const CAN_EXIT = ["in_queue", "in_interview"];
+const CAN_EXIT = ["in_queue", "in_interview", "on_hold"];
 
 export function StudentMyCompaniesPage() {
   const { socket } = useSocket();
@@ -203,6 +214,7 @@ export function StudentMyCompaniesPage() {
       case "pending":
         return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200"><Clock3 className="h-3 w-3 mr-1" />Requested</Badge>;
       case "in_queue":
+      case "on_hold":
         return <Badge className="bg-blue-100 text-blue-800 border-blue-200"><Users className="h-3 w-3 mr-1" />In Queue</Badge>;
       case "in_interview":
         return <Badge className="bg-orange-100 text-orange-800 border-orange-200"><Mic className="h-3 w-3 mr-1" />Interviewing</Badge>;
@@ -237,16 +249,34 @@ export function StudentMyCompaniesPage() {
           <div className="flex items-center text-sm font-medium text-yellow-700 bg-yellow-50 border border-yellow-300 rounded-md h-9 px-3">
             <Clock3 className="h-4 w-4 mr-1" />Requested
           </div>
-          <Button size="sm" variant="outline"
-            className="text-red-600 border-red-300 hover:bg-red-50 h-9 px-3"
-            onClick={() => handleLeaveQueue(company)} disabled={busy}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4 mr-1" />}
-            Cancel
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button size="sm" variant="outline"
+                className="text-red-600 border-red-300 hover:bg-red-50 h-9 px-3"
+                disabled={busy}>
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4 mr-1" />}
+                Cancel
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Cancel Queue Request?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to cancel your queue request for {company.name}?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>No, keep it</AlertDialogCancel>
+                <AlertDialogAction onClick={() => handleLeaveQueue(company)} className="bg-red-600 focus:ring-red-600 hover:bg-red-700">
+                  Yes, cancel request
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       );
     }
-    if (s === "in_queue") {
+    if (s === "in_queue" || s === "on_hold") {
       return (
         <div className="flex items-center gap-3">
           <div className="flex flex-col items-center bg-blue-50 border border-blue-200 rounded-md px-3 py-1 mr-2">
@@ -255,11 +285,29 @@ export function StudentMyCompaniesPage() {
               {company.queuePosition ? `#${company.queuePosition}` : "—"}
             </span>
           </div>
-          <Button size="sm" variant="outline"
-            className="text-red-600 border-red-300 hover:bg-red-50 min-w-[110px] h-10"
-            onClick={() => handleLeaveQueue(company)} disabled={busy}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><LogOut className="h-4 w-4 mr-1" />Exit Queue</>}
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button size="sm" variant="outline"
+                className="text-red-600 border-red-300 hover:bg-red-50 min-w-[110px] h-10"
+                disabled={busy}>
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><LogOut className="h-4 w-4 mr-1" />Exit Queue</>}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Exit Queue?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to leave the queue for {company.name}? You will lose your current position.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => handleLeaveQueue(company)} className="bg-red-600 focus:ring-red-600 hover:bg-red-700">
+                  Yes, leave queue
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       );
     }
@@ -272,11 +320,29 @@ export function StudentMyCompaniesPage() {
     }
     if (CAN_EXIT.includes(s ?? "")) {
       return (
-        <Button size="sm" variant="outline"
-          className="text-red-600 border-red-300 hover:bg-red-50 min-w-[110px]"
-          onClick={() => handleLeaveQueue(company)} disabled={busy}>
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><LogOut className="h-4 w-4 mr-1" />Exit Queue</>}
-        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button size="sm" variant="outline"
+              className="text-red-600 border-red-300 hover:bg-red-50 min-w-[110px]"
+              disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><LogOut className="h-4 w-4 mr-1" />Exit Queue</>}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Exit Queue?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to leave the queue for {company.name}? You will lose your current position.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => handleLeaveQueue(company)} className="bg-red-600 focus:ring-red-600 hover:bg-red-700">
+                Yes, leave queue
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       );
     }
     return null;
@@ -288,6 +354,7 @@ export function StudentMyCompaniesPage() {
       case "pending":
         return "border-yellow-300 bg-yellow-50/40 shadow-sm";
       case "in_queue":
+      case "on_hold":
         return "border-blue-300 bg-blue-50/40 shadow-sm";
       case "in_interview":
         return "border-orange-300 bg-orange-50/30 shadow-sm";
@@ -307,8 +374,22 @@ export function StudentMyCompaniesPage() {
     );
   }
 
+  const flaggedCompanies = companies.filter(c => c.queueStatus === "on_hold");
+
   return (
     <div className="space-y-6">
+      {flaggedCompanies.length > 0 && (
+        <div className="bg-red-50 border border-red-300 rounded-lg p-4 flex items-start gap-3 shadow-sm">
+          <AlertCircle className="h-6 w-6 text-red-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="text-red-800 font-bold text-lg mb-1">Queue Action Required: You have been flagged!</h3>
+            <p className="text-red-700">
+              The coordinator has flagged your absence for: <strong>{flaggedCompanies.map(c => c.name).join(", ")}</strong>. Please report to the venue immediately.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900 flex items-center">
