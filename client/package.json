@@ -45,6 +45,7 @@
     "cmdk": "1.1.1",
     "date-fns": "3.6.0",
     "embla-carousel-react": "8.6.0",
+    "esbuild": "^0.27.4",
     "input-otp": "1.4.2",
     "lucide-react": "0.487.0",
     "motion": "12.23.24",
@@ -68,13 +69,16 @@
     "vaul": "1.1.2"
   },
   "devDependencies": {
+    "@esbuild/win32-x64": "^0.27.4",
     "@tailwindcss/vite": "4.1.12",
     "@types/node": "^25.4.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "4.7.0",
+    "fdir": "^6.5.0",
     "tailwindcss": "4.1.12",
+    "tinyglobby": "^0.2.15",
     "typescript": "^5.9.3",
-    "vite": "^8.0.2"
+    "vite": "6"
   }
 }
