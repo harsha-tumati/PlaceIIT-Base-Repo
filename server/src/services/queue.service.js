@@ -7,7 +7,12 @@ const { getIO } = require("../config/socket");
 const InterviewRound = require("../models/InterviewRound.model");
 
 // Statuses that mean a student is "actively" occupying a slot
-const ACTIVE_STATUSES = [STUDENT_STATUS.PENDING, STUDENT_STATUS.IN_QUEUE, STUDENT_STATUS.IN_INTERVIEW];
+const ACTIVE_STATUSES = [
+  STUDENT_STATUS.PENDING,
+  STUDENT_STATUS.IN_QUEUE,
+  STUDENT_STATUS.IN_INTERVIEW,
+  STUDENT_STATUS.ON_HOLD,
+];
 const TERMINAL_STATUSES = [STUDENT_STATUS.COMPLETED, STUDENT_STATUS.REJECTED, STUDENT_STATUS.EXITED, STUDENT_STATUS.OFFER_GIVEN];
 
 const hasInterviewHistoryForCompany = async (studentId, companyId) => {
@@ -38,10 +43,17 @@ function safeEmitTo(room, event, data) {
    (pending or in_queue or in_interview) across ALL companies
 ─────────────────────────────────────────────────────────── */
 const hasActiveQueue = async (studentId) => {
-  return Queue.findOne({
+  const activeEntries = await Queue.find({
     studentId,
     status: { $in: ACTIVE_STATUSES },
-  }).populate("companyId", "name");
+  }).populate("companyId", "name isWalkInEnabled");
+
+  return activeEntries.find(entry => {
+    if (entry.isWalkIn && (!entry.companyId || !entry.companyId.isWalkInEnabled)) {
+      return false; // Stale walk-in entry
+    }
+    return true;
+  });
 };
 
 /* ─────────────────────────────────────────────────────────
@@ -64,24 +76,37 @@ const joinQueue = async (studentId, companyId, round = "Round 1", isWalkIn = fal
       throw new Error("Student is not shortlisted for this company");
   }
 
-  // Check existing entry for THIS company and THIS round
+  // Check existing entry for THIS company and THIS round  
   const existing = await Queue.findOne({ companyId, studentId, round });
   if (existing) {
+    let isStaleWalkIn = existing.isWalkIn && !company.isWalkInEnabled;
+
     if (ACTIVE_STATUSES.includes(existing.status)) {
-      throw new Error("You already have an active request for this round");
-    }
-    // Terminal entry exists — remove so we can create fresh pending
-    if (TERMINAL_STATUSES.includes(existing.status)) {
+      if (isStaleWalkIn) {
+        // Obsolete entry since walk-in is disabled, treat as terminal
+        await Queue.findByIdAndDelete(existing._id);
+      } else {
+        throw new Error("You already have an active request for this round");
+      }
+    } else if (TERMINAL_STATUSES.includes(existing.status) || isStaleWalkIn) {
+      // Terminal entry exists or it's a stale walk-in entry — remove so we can create fresh pending 
       await Queue.findByIdAndDelete(existing._id);
     }
   }
 
   // Check if student already active in another company → conflict
-  const activeElsewhere = await Queue.findOne({
+  const activeElsewheres = await Queue.find({
     studentId,
     companyId: { $ne: companyId },
     status: { $in: ACTIVE_STATUSES },
-  }).populate("companyId", "name");
+  }).populate("companyId", "name isWalkInEnabled");
+
+  const activeElsewhere = activeElsewheres.find(entry => {
+    if (entry.isWalkIn && (!entry.companyId || !entry.companyId.isWalkInEnabled)) {
+      return false; // Stale walk-in entry
+    }
+    return true;
+  });
 
   if (activeElsewhere) {
     if (activeElsewhere.status === STUDENT_STATUS.IN_INTERVIEW) {

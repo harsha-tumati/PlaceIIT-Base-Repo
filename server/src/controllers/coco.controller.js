@@ -33,7 +33,24 @@ const getQueueEntryPriority = (entry) => {
 const getAssignedCompany = async (req, res) => {
   try {
     const coco = await Coordinator.findOne({ userId: req.user.id }).populate("assignedCompanies");
-    res.json(coco?.assignedCompanies || []);
+    if (!coco) return res.json([]);
+
+    const DriveState = require("../models/DriveState.model");
+    const driveState = await DriveState.findOne();
+    if (!driveState || driveState.currentDay == null || !driveState.currentSlot) {
+      return res.json([]); // Fail-safe: treats as not assigned if drive state is missing
+    }
+
+    const currentDay = driveState.currentDay;
+    const currentSlot = driveState.currentSlot;
+
+    // Strict slot-day COCO assignment logic
+    // A COCO is only assigned if the company day+slot matches the current active day+slot
+    const validAssigned = coco.assignedCompanies.filter(c => 
+      c.day === currentDay && c.slot === currentSlot
+    );
+
+    res.json(validAssigned);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -212,6 +229,44 @@ const toggleWalkIn = async (req, res) => {
         })
       );
       await Promise.allSettled(notifPromises);
+    }
+
+    // Handle walk-in deactivation
+    if (!enabled && wasEnabled) {
+      const affectedEntries = await Queue.find({
+        companyId: company._id,
+        isWalkIn: true,
+        status: { $in: ["pending", "in_queue", "on_hold"] }
+      });
+
+      if (affectedEntries.length > 0) {
+        const entryIds = affectedEntries.map(e => e._id);
+
+        await Queue.updateMany(
+          { _id: { $in: entryIds } },
+          { $set: { status: "exited", completedAt: new Date() } }
+        );
+
+        // Emit queue updates and user updates
+        const { getIO } = require("../config/socket");
+        const io = getIO();
+        if (io) {
+          io.to(`company:${company._id}`).emit("queue:updated", { companyId: company._id });
+
+          for (const entry of affectedEntries) {
+            const st = await Student.findById(entry.studentId);
+            if (st && st.userId) {
+              io.to(`user:${st.userId}`).emit("status:updated", {
+                companyId: company._id,
+                status: "exited"
+              });
+            }
+          }
+        }
+
+        // Ensure positional rebalancing (optional but nice)
+        // Leaving it simple for now, resetting they are implicitly skipped anyway.
+      }
     }
 
     res.json(company);
@@ -436,8 +491,24 @@ const addStudentToRound = async (req, res) => {
       resolvedRoundId = resolvedRoundObj._id;
     }
 
-    // Backend only allows "not_joined" for newly added students
-    let finalStatus = "not_joined";
+    const activeQueueElsewhere = await Queue.findOne({
+      studentId,
+      companyId: { $ne: companyId },
+      status: { $in: ["pending", "in_queue", "in_interview", "on_hold"] },
+    }).populate("companyId", "name");
+
+    if (activeQueueElsewhere) {
+      const conflictCompanyName = activeQueueElsewhere.companyId?.name || "another company";
+      return res.status(409).json({
+        message: `Student is already in the queue for ${conflictCompanyName}.`,
+        code: "QUEUE_CONFLICT",
+        conflictCompanyId: activeQueueElsewhere.companyId?._id,
+        conflictCompanyName,
+        conflictRound: activeQueueElsewhere.round,
+      });
+    }
+
+    let finalStatus = "in_queue";
 
     const roundNameStr = resolvedRoundObj ? (resolvedRoundObj.roundName || `Round ${resolvedRoundObj.roundNumber}`) : "Round 1";
 
