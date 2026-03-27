@@ -169,6 +169,21 @@ const joinQueue = async (req, res) => {
     const student = await Student.findOne({ userId: req.user.id });
     if (!student) return res.status(404).json({ message: "Student not found" });
 
+    // Enforce active drive state — block join if company is not in active day/slot
+    const DriveState = require("../models/DriveState.model");
+    const Company = require("../models/Company.model");
+    const driveState = await DriveState.findOne({ key: "global" }).lean();
+    if (driveState) {
+      const company = await Company.findById(companyId).lean();
+      if (company) {
+        const companyDay = Number(company.day);
+        const companySlot = (company.slot || "").toLowerCase();
+        if (companyDay !== driveState.currentDay || companySlot !== (driveState.currentSlot || "").toLowerCase()) {
+          return res.status(403).json({ message: "This company is not in the currently active Day & Slot. Join Queue is not allowed." });
+        }
+      }
+    }
+
     const result = await queueService.joinQueue(student._id, companyId, round, false);
     res.json(result);
   } catch (err) {
@@ -248,6 +263,14 @@ const getWalkIns = async (req, res) => {
 
     const result = await Promise.all(
       companies.map(async (c) => {
+        const hasInterviewHistory = student
+          ? await queueService.hasInterviewHistoryForCompany(student._id, c._id)
+          : false;
+
+        if (hasInterviewHistory) {
+          return [];
+        }
+
         const queueEntries = student
           ? await Queue.find({
             companyId: c._id,

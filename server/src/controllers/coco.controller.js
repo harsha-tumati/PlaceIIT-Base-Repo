@@ -10,6 +10,7 @@ const roundService = require("../services/round.service");
 const { PREDEFINED_NOTIFICATIONS } = require("../utils/constants");
 
 const ACTIVE_QUEUE_STATUSES = ["in_queue", "in_interview", "on_hold", "pending", "not_joined"];
+const ROUND_TRACKING_QUEUE_STATUSES = ["in_queue", "in_interview", "on_hold", "not_joined", "completed"];
 
 const getQueueEntryPriority = (entry) => {
   const statusPriority = {
@@ -50,21 +51,51 @@ const getShortlistedStudents = async (req, res) => {
       });
     if (!company) return res.status(404).json({ message: "Company not found" });
 
-    // Attach queue status
-    const students = await Promise.all(
-      company.shortlistedStudents.map(async (s) => {
-        const queueEntries = await Queue.find({ companyId: company._id, studentId: s._id })
-          .populate("roundId", "roundName roundNumber")
-          .sort({ updatedAt: -1, createdAt: -1 });
-
-        const activeQueueEntry = queueEntries.find((entry) => ACTIVE_QUEUE_STATUSES.includes(entry.status));
-        const q = activeQueueEntry
-          || queueEntries.sort((a, b) => getQueueEntryPriority(b) - getQueueEntryPriority(a))[0]
-          || null;
-
-        return { ...s.toObject(), queueEntry: q };
+    // 1. Fetch all queue entries for this company to catch walk-ins
+    const allQueueEntries = await Queue.find({ companyId: company._id })
+      .populate({
+        path: "studentId",
+        populate: { path: "userId", select: "email" }
       })
-    );
+      .populate("roundId", "roundName roundNumber")
+      .sort({ updatedAt: -1, createdAt: -1 });
+
+    // 2. Base set of students: shortlisted ones
+    const baseStudentsMap = new Map();
+    if (company.shortlistedStudents) {
+      company.shortlistedStudents.forEach(s => {
+        if (s && s._id) {
+          baseStudentsMap.set(s._id.toString(), s);
+        }
+      });
+    }
+
+    // 3. Add any queue entry students (like walk-ins) who aren't shortlisted
+    allQueueEntries.forEach(qe => {
+      if (qe.studentId && qe.studentId._id) {
+        const sId = qe.studentId._id.toString();
+        if (!baseStudentsMap.has(sId)) {
+          baseStudentsMap.set(sId, qe.studentId);
+        }
+      }
+    });
+
+    const allStudents = Array.from(baseStudentsMap.values());
+
+    // 4. Attach queue status
+    const students = allStudents.map((s) => {
+      const studentQueueEntries = allQueueEntries.filter(
+        qe => qe.studentId && qe.studentId._id && qe.studentId._id.toString() === s._id.toString()
+      );
+
+      const activeQueueEntry = studentQueueEntries.find((entry) => ACTIVE_QUEUE_STATUSES.includes(entry.status));
+      const q = activeQueueEntry
+        || studentQueueEntries.sort((a, b) => getQueueEntryPriority(b) - getQueueEntryPriority(a))[0]
+        || null;
+
+      return { ...s.toObject(), queueEntry: q };
+    });
+
     res.json(students);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -356,7 +387,7 @@ const getRounds = async (req, res) => {
       const fallbackRoundStr = `Round ${round.roundNumber}`;
       const queueEntries = await Queue.find({
         companyId: req.params.companyId,
-        status: { $ne: "pending" },
+        status: { $in: ROUND_TRACKING_QUEUE_STATUSES },
         $or: [
           { roundId: round._id },
           { round: roundNameStr },
@@ -405,9 +436,8 @@ const addStudentToRound = async (req, res) => {
       resolvedRoundId = resolvedRoundObj._id;
     }
 
-    // Translate frontend 'yet-to-interview' to backend 'not_joined'
-    let inputStatus = req.body.status === "yet-to-interview" ? "not_joined" : req.body.status;
-    let finalStatus = inputStatus || "in_queue";
+    // Backend only allows "not_joined" for newly added students
+    let finalStatus = "not_joined";
 
     const roundNameStr = resolvedRoundObj ? (resolvedRoundObj.roundName || `Round ${resolvedRoundObj.roundNumber}`) : "Round 1";
 
@@ -459,6 +489,25 @@ const addStudentToRound = async (req, res) => {
       $addToSet: { shortlistedCompanies: companyId },
     });
 
+    const studentDoc = await Student.findById(studentId);
+    if (studentDoc && studentDoc.userId) {
+      const companyDoc = await Company.findById(companyId);
+      const companyName = companyDoc ? companyDoc.name : "the company";
+      const message = `You have been added to ${roundNameStr} for ${companyName}`;
+      await notificationService.sendNotification({
+        recipientId: studentDoc.userId,
+        senderId: req.user.id,
+        companyId,
+        message,
+        type: "interview_call",
+      });
+      const { getIO } = require("../config/socket");
+      const io = getIO();
+      if (io) {
+        io.to(`user:${studentDoc.userId}`).emit("status:updated", { companyId, status: finalStatus });
+      }
+    }
+
     res.json(queueEntry);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -485,6 +534,9 @@ const uploadStudentsToRound = async (req, res) => {
       });
     }
 
+    const companyDoc = await Company.findById(companyId);
+    const companyName = companyDoc ? companyDoc.name : "the company";
+
     // Parse the Excel file
     const XLSX = require("xlsx");
     const workbook = XLSX.readFile(req.file.path);
@@ -507,14 +559,14 @@ const uploadStudentsToRound = async (req, res) => {
       let queueEntry = await Queue.findOne({ studentId: student._id, companyId });
       if (queueEntry) {
         queueEntry.roundId = round._id;
-        queueEntry.status = "in_queue";
+        queueEntry.status = "not_joined";
         await queueEntry.save();
       } else {
         await Queue.create({
           studentId: student._id,
           companyId,
           roundId: round._id,
-          status: "in_queue",
+          status: "not_joined",
         });
       }
 
@@ -525,6 +577,22 @@ const uploadStudentsToRound = async (req, res) => {
       await Student.findByIdAndUpdate(student._id, {
         $addToSet: { shortlistedCompanies: companyId },
       });
+
+      if (student.userId) {
+        const message = `You have been added to ${round.roundName} for ${companyName}`;
+        await notificationService.sendNotification({
+          recipientId: student.userId,
+          senderId: req.user.id,
+          companyId,
+          message,
+          type: "interview_call",
+        });
+        const { getIO } = require("../config/socket");
+        const io = getIO();
+        if (io) {
+          io.to(`user:${student.userId}`).emit("status:updated", { companyId, status: "not_joined" });
+        }
+      }
 
       added++;
     }

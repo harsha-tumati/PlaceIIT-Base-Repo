@@ -13,6 +13,10 @@ export function ChangePasswordRoute() {
   const auth = useAuth();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [emergencyContactName, setEmergencyContactName] = useState("");
+  const [emergencyContactPhone, setEmergencyContactPhone] = useState("");
+  const [friendContactName, setFriendContactName] = useState("");
+  const [friendContactPhone, setFriendContactPhone] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,10 +30,31 @@ export function ChangePasswordRoute() {
       toast.error("Passwords do not match.");
       return;
     }
+    if (!emergencyContactName.trim() || !emergencyContactPhone.trim()) {
+      toast.error("Emergency contact fields are required.");
+      return;
+    }
+    if (!/^\d{10}$/.test(emergencyContactPhone.trim())) {
+      toast.error("Emergency contact phone number must be exactly 10 digits.");
+      return;
+    }
+    if (friendContactPhone.trim() && !/^\d{10}$/.test(friendContactPhone.trim())) {
+      toast.error("Friend contact phone number must be exactly 10 digits.");
+      return;
+    }
 
     setLoading(true);
     try {
-      const res = await authApi.changePassword(newPassword);
+      const res = await authApi.changePassword(newPassword, undefined, {
+        emergencyContact: {
+          name: emergencyContactName.trim(),
+          phone: emergencyContactPhone.trim(),
+        },
+        friendContact: friendContactName.trim() && friendContactPhone.trim() ? {
+          name: friendContactName.trim(),
+          phone: friendContactPhone.trim(),
+        } : undefined as any,
+      });
       // Update local storage / context if necessary, or just force them to log in again
       if (res.user) {
          // Optionally update the context here, but simplest is to redirect to portal
@@ -66,7 +91,7 @@ export function ChangePasswordRoute() {
           <CardHeader className="bg-indigo-600 text-white pb-6 pt-8 px-8">
             <CardTitle className="text-2xl font-bold">Change Password</CardTitle>
             <CardDescription className="text-indigo-100 mt-2">
-              Please enter a new, secure password.
+              Please enter a new, secure password and complete your required contact details.
             </CardDescription>
           </CardHeader>
           <CardContent className="px-8 py-8 bg-white">
@@ -92,6 +117,52 @@ export function ChangePasswordRoute() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Re-enter new password"
                   required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="emergency-contact-name">Emergency Contact Name</Label>
+                <Input
+                  id="emergency-contact-name"
+                  value={emergencyContactName}
+                  onChange={(e) => setEmergencyContactName(e.target.value)}
+                  placeholder="Emergency contact name"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="emergency-contact-phone">Emergency Contact Phone</Label>
+                <Input
+                  id="emergency-contact-phone"
+                  value={emergencyContactPhone}
+                  onChange={(e) => setEmergencyContactPhone(e.target.value)}
+                  placeholder="10-digit phone number"
+                  inputMode="numeric"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="friend-contact-name">Friend Contact Name</Label>
+                <Input
+                  id="friend-contact-name"
+                  value={friendContactName}
+                  onChange={(e) => setFriendContactName(e.target.value)}
+                  placeholder="Friend contact name"
+
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="friend-contact-phone">Friend Contact Phone</Label>
+                <Input
+                  id="friend-contact-phone"
+                  value={friendContactPhone}
+                  onChange={(e) => setFriendContactPhone(e.target.value)}
+                  placeholder="10-digit phone number"
+                  inputMode="numeric"
+
                 />
               </div>
 

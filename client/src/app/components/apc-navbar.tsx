@@ -1,11 +1,5 @@
 import { Button } from "@/app/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from "@/app/components/ui/dropdown-menu";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -23,6 +17,12 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/app/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/app/components/ui/dropdown-menu";
 import { Search, Users, Building2, LogOut, User, Bell } from "lucide-react";
 import { APCNotificationsPage } from "@/app/components/apc/apc-notifications-page";
 
@@ -38,7 +38,7 @@ export function APCNavbar({ onNavigate, userName = "Admin", isMainAdmin, unreadN
     <nav className="bg-white border-b border-gray-200 shadow-sm">
       <div className="container mx-auto px-8 py-3.5">
         <div className="flex items-center justify-between">
-          <button 
+          <button
             onClick={() => onNavigate?.('home')}
             className="flex items-center space-x-2 hover:opacity-80 transition-opacity"
           >
@@ -47,37 +47,37 @@ export function APCNavbar({ onNavigate, userName = "Admin", isMainAdmin, unreadN
               | APC Portal
             </span>
           </button>
-          
+
           <div className="flex items-center space-x-8">
-            <button 
+            <button
               onClick={() => onNavigate?.('home')}
               className="text-gray-500 hover:text-gray-900 transition-colors font-medium"
             >
               Home
             </button>
-            
-            <button 
+
+            <button
               onClick={() => onNavigate?.('student-search')}
               className="text-gray-500 hover:text-gray-900 transition-colors font-medium"
             >
               Students
             </button>
-            
-            <button 
+
+            <button
               onClick={() => onNavigate?.('manage-cocos')}
               className="text-gray-500 hover:text-gray-900 transition-colors font-medium"
             >
               CoCos
             </button>
-            
-            <button 
+
+            <button
               onClick={() => onNavigate?.('manage-companies')}
               className="text-gray-500 hover:text-gray-900 transition-colors font-medium"
             >
               Companies
             </button>
-            
-            <button 
+
+            <button
               onClick={() => onNavigate?.('queries')}
               className="text-gray-500 hover:text-gray-900 transition-colors font-medium"
             >
@@ -85,14 +85,14 @@ export function APCNavbar({ onNavigate, userName = "Admin", isMainAdmin, unreadN
             </button>
 
             {isMainAdmin && (
-              <button 
+              <button
                 onClick={() => onNavigate?.('manage-apcs')}
                 className="text-emerald-600 hover:text-emerald-700 transition-colors font-medium flex items-center gap-1"
               >
                 APCs
               </button>
             )}
-            
+
             <div className="flex items-center gap-3 ml-4 pl-4 border-l border-gray-200">
               {/* Notification Bell */}
               <Sheet>
@@ -160,7 +160,7 @@ export function APCNavbar({ onNavigate, userName = "Admin", isMainAdmin, unreadN
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction 
+                    <AlertDialogAction
                       onClick={() => onNavigate?.("logout")}
                       className="bg-red-600 focus:ring-red-600 hover:bg-red-700"
                     >

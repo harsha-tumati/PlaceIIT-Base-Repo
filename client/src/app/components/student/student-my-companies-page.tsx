@@ -9,7 +9,7 @@ import {
 } from "@/app/components/ui/dialog";
 import {
   Building2, MapPin, Clock, CheckCircle, AlertCircle, Calendar,
-  Search, Loader2, Users, Mic, LogIn, LogOut, Clock3, XCircle,
+  Search, Loader2, Users, Mic, LogIn, LogOut, Clock3, XCircle, Flag,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -26,6 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { studentApi } from "@/app/lib/api";
 import { useSocket } from "@/app/socket-context";
 import { toast } from "sonner";
+import { useEffect as useDriveEffect } from "react";
 
 interface Company {
   id: string;
@@ -46,17 +47,21 @@ interface Company {
 // Statuses that allow clicking Join Queue
 const CAN_JOIN = [null, "not_joined", "exited", "rejected"];
 // Statuses that show Exit Queue button
-const CAN_EXIT = ["in_queue", "in_interview"];
+const CAN_EXIT = ["in_queue", "in_interview", "on_hold"];
 
 export function StudentMyCompaniesPage() {
   const { socket } = useSocket();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDay, setSelectedDay] = useState("all");
-  const [selectedRound, setSelectedRound] = useState("all");
+  const [selectedSlot, setSelectedSlot] = useState("all");
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   // companyId-round currently being actioned (shows spinner)
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // ── Active Drive State ──
+  const [driveDay, setDriveDay] = useState<number | null>(null);
+  const [driveSlot, setDriveSlot] = useState<string | null>(null);
 
   // Queue switch confirmation modal
   const [switchModal, setSwitchModal] = useState<{
@@ -100,15 +105,28 @@ export function StudentMyCompaniesPage() {
 
   useEffect(() => { fetchCompanies(); }, [fetchCompanies]);
 
+  // ── Fetch drive state on mount ──
+  useDriveEffect(() => {
+    studentApi.getDriveState().then((ds: any) => {
+      if (ds) { setDriveDay(ds.currentDay ?? null); setDriveSlot(ds.currentSlot ?? null); }
+    }).catch(() => {});
+  }, []);
+
   // Real-time refresh when status changes (COCO accepts/rejects)
   useEffect(() => {
     if (!socket) return;
     const refresh = () => fetchCompanies();
     socket.on("status:updated", refresh);
     socket.on("queue:updated", refresh);
+    // Listen for drive state updates
+    const handleDriveUpdate = (ds: any) => {
+      if (ds) { setDriveDay(ds.currentDay ?? null); setDriveSlot(ds.currentSlot ?? null); }
+    };
+    socket.on("driveState:updated", handleDriveUpdate);
     return () => {
       socket.off("status:updated", refresh);
       socket.off("queue:updated", refresh);
+      socket.off("driveState:updated", handleDriveUpdate);
     };
   }, [socket, fetchCompanies]);
 
@@ -196,24 +214,24 @@ export function StudentMyCompaniesPage() {
 
   /* ─── Filters ─── */
   const uniqueDays = [...new Set(companies.map(c => c.day))].filter(Boolean);
-  const uniqueRounds = [...new Set(companies.map(c => c.round))]
-    .filter(Boolean).sort((a, b) => a.localeCompare(b));
-
   const filtered = companies.filter(c => {
     const q = searchQuery.toLowerCase();
     return (
-      (c.name.toLowerCase().includes(q) || c.day.toLowerCase().includes(q) || c.round.toLowerCase().includes(q)) &&
+      (c.name.toLowerCase().includes(q) || c.day.toLowerCase().includes(q) || (c.slot && c.slot.toLowerCase().includes(q))) &&
       (selectedDay === "all" || c.day === selectedDay) &&
-      (selectedRound === "all" || c.round === selectedRound)
+      (selectedSlot === "all" || (c.slot && c.slot.toLowerCase() === selectedSlot))
     );
   });
 
   /* ─── Status Badge ─── */
   const getStatusBadge = (status: string | null) => {
     switch (status) {
+      case "not_joined":
+        return <Badge className="bg-purple-100 text-purple-800 border-purple-200"><Clock3 className="h-3 w-3 mr-1" />Yet to be Interviewed</Badge>;
       case "pending":
         return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200"><Clock3 className="h-3 w-3 mr-1" />Requested</Badge>;
       case "in_queue":
+      case "on_hold":
         return <Badge className="bg-blue-100 text-blue-800 border-blue-200"><Users className="h-3 w-3 mr-1" />In Queue</Badge>;
       case "in_interview":
         return <Badge className="bg-orange-100 text-orange-800 border-orange-200"><Mic className="h-3 w-3 mr-1" />Interviewing</Badge>;
@@ -235,6 +253,16 @@ export function StudentMyCompaniesPage() {
     const s = company.queueStatus;
 
     if (CAN_JOIN.includes(s)) {
+      // STRICT: Only show Join Queue if BOTH day AND slot match active drive state
+      // If drive state is not loaded yet, hide the button (fail-safe)
+      if (driveDay == null || !driveSlot) return null;
+
+      const companyDayNum = parseInt(company.day.replace("Day ", ""), 10);
+      const isActiveDay = !isNaN(companyDayNum) && companyDayNum === driveDay;
+      const isActiveSlot = company.slot.toLowerCase() === driveSlot.toLowerCase();
+
+      if (!isActiveDay || !isActiveSlot) return null;
+
       return (
         <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white min-w-[110px]"
           onClick={() => handleJoinQueue(company)} disabled={busy}>
@@ -275,7 +303,7 @@ export function StudentMyCompaniesPage() {
         </div>
       );
     }
-    if (s === "in_queue") {
+    if (s === "in_queue" || s === "on_hold") {
       return (
         <div className="flex items-center gap-3">
           <div className="flex flex-col items-center bg-blue-50 border border-blue-200 rounded-md px-3 py-1 mr-2">
@@ -353,6 +381,7 @@ export function StudentMyCompaniesPage() {
       case "pending":
         return "border-yellow-300 bg-yellow-50/40 shadow-sm";
       case "in_queue":
+      case "on_hold":
         return "border-blue-300 bg-blue-50/40 shadow-sm";
       case "in_interview":
         return "border-orange-300 bg-orange-50/30 shadow-sm";
@@ -372,8 +401,22 @@ export function StudentMyCompaniesPage() {
     );
   }
 
+  const flaggedCompanies = companies.filter(c => c.queueStatus === "on_hold");
+
   return (
     <div className="space-y-6">
+      {flaggedCompanies.length > 0 && (
+        <div className="bg-red-50 border border-red-300 rounded-lg p-4 flex items-start gap-3 shadow-sm">
+          <AlertCircle className="h-6 w-6 text-red-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="text-red-800 font-bold text-lg mb-1">Queue Action Required: You have been flagged!</h3>
+            <p className="text-red-700">
+              The coordinator has flagged your absence for: <strong>{flaggedCompanies.map(c => c.name).join(", ")}</strong>. Please report to the venue immediately.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900 flex items-center">
@@ -391,7 +434,7 @@ export function StudentMyCompaniesPage() {
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
-              <Input placeholder="Search by company name, day or round…" value={searchQuery}
+              <Input placeholder="Search by company name, day or slot…" value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)} className="pl-10" />
             </div>
             <Select value={selectedDay} onValueChange={setSelectedDay}>
@@ -401,11 +444,12 @@ export function StudentMyCompaniesPage() {
                 {uniqueDays.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Select value={selectedRound} onValueChange={setSelectedRound}>
-              <SelectTrigger className="w-full md:w-48"><SelectValue placeholder="All Rounds" /></SelectTrigger>
+            <Select value={selectedSlot} onValueChange={setSelectedSlot}>
+              <SelectTrigger className="w-full md:w-48"><SelectValue placeholder="All Slots" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Rounds</SelectItem>
-                {uniqueRounds.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                <SelectItem value="all">All Slots</SelectItem>
+                <SelectItem value="morning">Morning</SelectItem>
+                <SelectItem value="afternoon">Afternoon</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -450,7 +494,6 @@ export function StudentMyCompaniesPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2 mb-1">
                       <CardTitle className="text-xl text-gray-900">{company.name}</CardTitle>
-                      <Badge variant="outline" className="text-xs">Priority {company.priority}</Badge>
                       <Badge variant="outline" className="text-xs">{company.round}</Badge>
                       {company.isWalkIn && <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">Walk-in</Badge>}
                       {getStatusBadge(company.queueStatus)}
