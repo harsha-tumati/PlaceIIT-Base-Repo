@@ -38,12 +38,12 @@ const updateProfile = async (req, res) => {
     if (email) {
       await User.findByIdAndUpdate(req.user.id, { email });
     }
-    
+
     // Fetch and return the fully populated object so frontend has the updated email
     const updatedStudent = await Student.findOne({ userId: req.user.id })
       .populate("userId", "email")
       .populate("shortlistedCompanies", "name logo day slot venue mode currentRound");
-      
+
     if (!updatedStudent) return res.status(404).json({ message: "Student not found" });
     res.json(updatedStudent);
   } catch (err) {
@@ -168,24 +168,28 @@ const getMyCompanies = async (req, res) => {
           }];
         }
 
-        const tiles = await Promise.all(queueEntries.map(async (entry) => {
-          let liveQueueEntry = entry.toObject();
-          const roundStr = entry.round || "Round 1";
-          const totalInQueue = await Queue.countDocuments({ companyId: company._id, status: "in_queue", round: roundStr });
+        queueEntries.sort((a, b) => {
+          const numA = parseInt((a.round || "Round 1").match(/\d+/)?.[0] || "1", 10);
+          const numB = parseInt((b.round || "Round 1").match(/\d+/)?.[0] || "1", 10);
+          if (numA !== numB) return numB - numA;
+          return b.createdAt - a.createdAt;
+        });
 
-          if (liveQueueEntry.status === "in_queue") {
-            const ahead = await Queue.countDocuments({
-              companyId: company._id,
-              status: "in_queue",
-              round: roundStr,
-              position: { $lt: liveQueueEntry.position },
-            });
-            liveQueueEntry.position = ahead + 1;
-          }
-          return { ...company, round: roundStr, queueEntry: liveQueueEntry, totalInQueue };
-        }));
+        const entry = queueEntries[0];
+        let liveQueueEntry = entry.toObject();
+        const roundStr = entry.round || "Round 1";
+        const totalInQueue = await Queue.countDocuments({ companyId: company._id, status: "in_queue", round: roundStr });
 
-        return tiles;
+        if (liveQueueEntry.status === "in_queue") {
+          const ahead = await Queue.countDocuments({
+            companyId: company._id,
+            status: "in_queue",
+            round: roundStr,
+            position: { $lt: liveQueueEntry.position },
+          });
+          liveQueueEntry.position = ahead + 1;
+        }
+        return [{ ...company, round: roundStr, queueEntry: liveQueueEntry, totalInQueue }];
       })
     );
 
@@ -322,24 +326,28 @@ const getWalkIns = async (req, res) => {
           }];
         }
 
-        const tiles = await Promise.all(queueEntries.map(async (entry) => {
-          let liveQueueEntry = entry.toObject();
-          const roundStr = entry.round || "Round 1";
-          const totalInQueue = await Queue.countDocuments({ companyId: c._id, status: "in_queue", round: roundStr });
+        queueEntries.sort((a, b) => {
+          const numA = parseInt((a.round || "Round 1").match(/\d+/)?.[0] || "1", 10);
+          const numB = parseInt((b.round || "Round 1").match(/\d+/)?.[0] || "1", 10);
+          if (numA !== numB) return numB - numA;
+          return b.createdAt - a.createdAt;
+        });
 
-          if (liveQueueEntry.status === "in_queue") {
-            const ahead = await Queue.countDocuments({
-              companyId: c._id,
-              status: "in_queue",
-              round: roundStr,
-              position: { $lt: liveQueueEntry.position },
-            });
-            liveQueueEntry.position = ahead + 1;
-          }
-          return { ...c.toObject(), round: roundStr, queueEntry: liveQueueEntry, totalInQueue };
-        }));
+        const entry = queueEntries[0];
+        let liveQueueEntry = entry.toObject();
+        const roundStr = entry.round || "Round 1";
+        const totalInQueue = await Queue.countDocuments({ companyId: c._id, status: "in_queue", round: roundStr });
 
-        return tiles;
+        if (liveQueueEntry.status === "in_queue") {
+          const ahead = await Queue.countDocuments({
+            companyId: c._id,
+            status: "in_queue",
+            round: roundStr,
+            position: { $lt: liveQueueEntry.position },
+          });
+          liveQueueEntry.position = ahead + 1;
+        }
+        return [{ ...c.toObject(), round: roundStr, queueEntry: liveQueueEntry, totalInQueue }];
       })
     );
 
@@ -424,7 +432,7 @@ const getMyQueries = async (req, res) => {
     const queries = await Query.find({ studentUserId: req.user.id })
       .populate("respondedBy", "instituteId email")
       .sort({ createdAt: -1 });
-    
+
     // Attach APC responder name
     const result = await Promise.all(
       queries.map(async (q) => {
@@ -436,7 +444,7 @@ const getMyQueries = async (req, res) => {
         return queryObj;
       })
     );
-    
+
     res.json(result);
   } catch (err) {
     res.status(500).json({ message: err.message });
