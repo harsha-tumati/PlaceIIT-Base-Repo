@@ -46,7 +46,7 @@ const getAssignedCompany = async (req, res) => {
 
     // Strict slot-day COCO assignment logic
     // A COCO is only assigned if the company day+slot matches the current active day+slot
-    const validAssigned = coco.assignedCompanies.filter(c => 
+    const validAssigned = coco.assignedCompanies.filter(c =>
       c.day === currentDay && c.slot === currentSlot
     );
 
@@ -99,6 +99,12 @@ const getShortlistedStudents = async (req, res) => {
 
     const allStudents = Array.from(baseStudentsMap.values());
 
+    const studentIds = allStudents.map(s => s._id);
+    const globalActiveQueues = await Queue.find({
+      studentId: { $in: studentIds },
+      status: { $in: ["in_queue", "in_interview", "on_hold", "pending"] }
+    }).populate("companyId", "name");
+
     // 4. Attach queue status
     const students = allStudents.map((s) => {
       const studentQueueEntries = allQueueEntries.filter(
@@ -110,7 +116,20 @@ const getShortlistedStudents = async (req, res) => {
         || studentQueueEntries.sort((a, b) => getQueueEntryPriority(b) - getQueueEntryPriority(a))[0]
         || null;
 
-      return { ...s.toObject(), queueEntry: q };
+      const sObj = typeof s.toObject === "function" ? s.toObject() : { ...s };
+
+      // check if active globally in another company
+      const globalQueue = globalActiveQueues.find(
+        (gq) => gq.studentId.toString() === s._id.toString() && gq.companyId && gq.companyId._id.toString() !== company._id.toString()
+      );
+
+      if (globalQueue) {
+        sObj.inInterview = globalQueue.status === "in_interview";
+        sObj.interviewWith = sObj.inInterview ? globalQueue.companyId.name : undefined;
+        sObj.queuedFor = !sObj.inInterview ? globalQueue.companyId.name : undefined;
+      }
+
+      return { ...sObj, queueEntry: q };
     });
 
     res.json(students);

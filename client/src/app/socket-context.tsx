@@ -40,7 +40,9 @@ export function SocketProvider({ children, userId }: SocketProviderProps) {
 
   useEffect(() => {
     // Connect directly to the backend to bypass Vite proxy crash on Bun
-    const socket = io("http://127.0.0.1:5000", {
+    // Note: Default backend port is 5001 based on .env
+    const backendUrl = (import.meta as any).env?.VITE_API_BASE_URL || "http://127.0.0.1:5001";
+    const socket = io(backendUrl, {
       transports: ["websocket", "polling"],
       autoConnect: true,
     });

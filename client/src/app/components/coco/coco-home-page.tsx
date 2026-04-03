@@ -30,6 +30,8 @@ interface Student {
   locationStatus: "in-queue" | "in-interview" | "no-show" | "completed-day";
   currentCompany?: string;
   userId: string;
+  globalStatus?: string;
+  isBusyGlobally?: boolean;
 }
 
 interface Panel {
@@ -162,6 +164,8 @@ export function CoCoHomePage({ companyName, onRoundTracking }: CoCoHomePageProps
       locationStatus: (statusMap[statusRaw] ?? "unassigned") as Student["locationStatus"],
       currentCompany: raw.companyName ?? compName,
       userId: raw.userId?._id ?? (typeof raw.userId === 'string' ? raw.userId : '') ?? "",
+      globalStatus: raw.inInterview ? `In Interview at ${raw.interviewWith}` : (raw.queuedFor ? `In Queue at ${raw.queuedFor}` : undefined),
+      isBusyGlobally: !!raw.inInterview || !!raw.queuedFor,
     };
   };
 
@@ -554,7 +558,7 @@ export function CoCoHomePage({ companyName, onRoundTracking }: CoCoHomePageProps
     }
   };
 
-  const getLocationBadge = (locationStatus: Student["locationStatus"], currentCompany?: string) => {
+  const getLocationBadge = (locationStatus: Student["locationStatus"], currentCompany?: string, globalStatus?: string) => {
     switch (locationStatus) {
       case "in-queue":
         if (currentCompany) {
@@ -590,7 +594,19 @@ export function CoCoHomePage({ companyName, onRoundTracking }: CoCoHomePageProps
           </div>
         );
     }
-    // Default: Idle
+
+    // Default: Idle or Busy Globally
+    if (globalStatus) {
+      return (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+          <div className="flex items-center">
+            <Clock className="h-4 w-4 text-amber-500 mr-2" />
+            <span className="text-sm font-medium text-amber-700">{globalStatus}</span>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
         <div className="flex items-center">
@@ -1014,14 +1030,29 @@ export function CoCoHomePage({ companyName, onRoundTracking }: CoCoHomePageProps
                     </div>
                   </div>
                   <div className="max-h-64 overflow-y-auto space-y-2">
-                    {searchResults.map((s: any) => (
-                      <div key={s._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                        <div><p className="font-semibold text-gray-900">{s.name}</p><p className="text-xs text-gray-500">{s.rollNumber}</p></div>
-                        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => handleAddStudentToQueue(s._id, s.name)} disabled={addingStudentId === s._id}>
-                          {addingStudentId === s._id ? <Loader2 className="h-4 w-4 animate-spin" /> : `Add to Round ${queueRoundInput}`}
-                        </Button>
-                      </div>
-                    ))}
+                    {searchResults.map((s: any) => {
+                      const isQueued = !!s.queuedFor;
+                      const inInterview = !!s.inInterview;
+                      const busyMessage = inInterview ? `In Interview at ${s.interviewWith}` : (isQueued ? `In Queue at ${s.queuedFor}` : null);
+                      const isBusy = !!busyMessage;
+                      return (
+                        <div key={s._id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 gap-3">
+                          <div>
+                            <p className="font-semibold text-gray-900">{s.name}</p>
+                            <p className="text-xs text-gray-500">{s.rollNumber}</p>
+                            {isBusy && <Badge variant="outline" className="mt-1 bg-amber-50 text-amber-700 border-amber-200 text-[10px]">{busyMessage}</Badge>}
+                          </div>
+                          <Button
+                            size="sm"
+                            className={isBusy ? "bg-gray-100 text-gray-400 hover:bg-gray-100 border border-gray-200 cursor-not-allowed" : "bg-green-600 hover:bg-green-700 text-white"}
+                            onClick={() => handleAddStudentToQueue(s._id, s.name)}
+                            disabled={isBusy || addingStudentId === s._id}
+                          >
+                            {addingStudentId === s._id ? <Loader2 className="h-4 w-4 animate-spin" /> : (isBusy ? "Already in Queue" : `Add to Round ${queueRoundInput}`)}
+                          </Button>
+                        </div>
+                      );
+                    })}
                     {searchResults.length === 0 && !searchingStudents && studentSearchQuery && (
                       <p className="text-sm text-center text-gray-500 mt-4">No matching students found.</p>
                     )}
@@ -1090,7 +1121,7 @@ export function CoCoHomePage({ companyName, onRoundTracking }: CoCoHomePageProps
                   </div>
 
                   {/* Location status bar — full-width single-line pill */}
-                  {getLocationBadge(student.locationStatus, student.currentCompany)}
+                  {getLocationBadge(student.locationStatus, student.currentCompany, student.globalStatus)}
 
                   {/* Contact row */}
                   <div className="grid md:grid-cols-2 gap-3 text-sm">
@@ -1109,11 +1140,12 @@ export function CoCoHomePage({ companyName, onRoundTracking }: CoCoHomePageProps
                     {student.status === "unassigned" ? (
                       <Button
                         size="sm"
-                        className="bg-green-600 hover:bg-green-700 text-white"
+                        className={student.isBusyGlobally ? "bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed" : "bg-green-600 hover:bg-green-700 text-white"}
+                        disabled={student.isBusyGlobally}
                         onClick={() => { setIsAddQueueOpen(true); setStudentSearchQuery(student.name); handleSearchStudents(); }}
                       >
                         <UserPlus className="h-3.5 w-3.5 mr-1" />
-                        Add to Queue
+                        {student.isBusyGlobally ? "Currently Busy" : "Add to Queue"}
                       </Button>
                     ) : (
                       <>
