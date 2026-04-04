@@ -139,9 +139,8 @@ export function APCProfilePage({ userName, userId }: APCProfilePageProps) {
                     <Input
                       id="name"
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      disabled={!isEditingProfile}
-                      className="pl-10"
+                      disabled
+                      className="pl-10 bg-gray-50"
                     />
                   </div>
                 </div>

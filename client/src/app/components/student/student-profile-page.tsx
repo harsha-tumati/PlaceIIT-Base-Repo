@@ -129,7 +129,7 @@ export function StudentProfilePage({ rollNo }: { rollNo: string }) {
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>
-              <Input id="name" value={profileData.name} onChange={set("name")} disabled={!isEditing} />
+              <Input id="name" value={profileData.name} disabled className="bg-gray-50" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="rollNo">Roll Number</Label>

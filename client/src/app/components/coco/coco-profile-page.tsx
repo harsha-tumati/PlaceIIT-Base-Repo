@@ -122,7 +122,7 @@ export function CoCoProfilePage({ userId }: { userId: string }) {
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>
-              <Input id="name" value={profileData.name} onChange={(e) => setProfileData({ ...profileData, name: e.target.value })} disabled={!isEditing} />
+              <Input id="name" value={profileData.name} disabled className="bg-gray-50" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="userId">User ID</Label>
