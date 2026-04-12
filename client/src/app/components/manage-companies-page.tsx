@@ -76,13 +76,13 @@ export function ManageCompaniesPage({ onCompanyClick }: ManageCompaniesPageProps
     const companyDay = raw.day;
     const companySlot = raw.slot;
     const matchesDrive = (activeDriveDay == null || companyDay === activeDriveDay) &&
-                         (!activeDriveSlot || companySlot === activeDriveSlot);
+      (!activeDriveSlot || companySlot === activeDriveSlot);
 
     const cocoAssigned = matchesDrive && raw.assignedCocos?.length
       ? raw.assignedCocos.map((c: any) => {
-          const idStr = c.userId?.instituteId ? ` (${c.userId.instituteId})` : "";
-          return `${c.name ?? c}${idStr}`;
-        }).join(", ")
+        const idStr = c.userId?.instituteId ? ` (${c.userId.instituteId})` : "";
+        return `${c.name ?? c}${idStr}`;
+      }).join(", ")
       : "Not Assigned";
 
     return {
@@ -116,7 +116,7 @@ export function ManageCompaniesPage({ onCompanyClick }: ManageCompaniesPageProps
     adminApi.getDriveState().then((data: any) => {
       setDriveDay(data.currentDay ?? null);
       setDriveSlot(data.currentSlot ?? null);
-    }).catch(() => {});
+    }).catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -144,6 +144,15 @@ export function ManageCompaniesPage({ onCompanyClick }: ManageCompaniesPageProps
 
   const handleAddCompany = async () => {
     if (!newCompanyName || !newCompanyDay || !newCompanySlot || !newCompanyVenue) return;
+    const emojiRegex = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu;
+    if (emojiRegex.test(newCompanyVenue)) {
+      toast.error("Company venue cannot contain emojis");
+      return;
+    }
+    if (emojiRegex.test(newCompanyName)) {
+      toast.error("Company name cannot contain emojis");
+      return;
+    }
     setSaving(true);
     try {
       const dayNum = parseInt(newCompanyDay.replace("Day ", ""), 10);
@@ -178,9 +187,21 @@ export function ManageCompaniesPage({ onCompanyClick }: ManageCompaniesPageProps
 
   const handleVenueBlur = async (company: Company) => {
     try {
+      if (company.venue === "") {
+        toast.error("Company venue cannot be empty");
+        await fetchCompanies();
+        return;
+      }
+      const emojiRegex = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu;
+      if (emojiRegex.test(company.venue)) {
+        toast.error("Company venue cannot contain emojis");
+        await fetchCompanies();
+        return;
+      }
       await adminApi.updateCompany(company.id, { venue: company.venue });
     } catch (err: any) {
       toast.error("Failed to save venue: " + (err.message ?? ""));
+      await fetchCompanies();
     }
   };
 
@@ -514,23 +535,31 @@ export function ManageCompaniesPage({ onCompanyClick }: ManageCompaniesPageProps
 
                           {/* Suggestions Dropdown */}
                           {studentSuggestions.length > 0 && (
-                            <div className="absolute z-50 mt-1 w-[calc(100%-48px)] max-h-60 overflow-auto bg-white border border-gray-200 rounded-md shadow-lg">
-                              {studentSuggestions.map((s) => {
-                                const isSelected = selectedStudentsForShortlist.some(sel => sel._id === s._id);
-                                return (
-                                  <div
-                                    key={s._id}
-                                    className="px-4 py-2 hover:bg-indigo-50 cursor-pointer flex items-center justify-between border-b last:border-0"
-                                    onClick={() => toggleStudentSelection(s)}
-                                  >
-                                    <div>
-                                      <div className="font-medium text-sm text-gray-900">{s.name}</div>
-                                      <div className="text-xs text-gray-500">{s.rollNumber} • {s.branch}</div>
+                            <div className="absolute z-50 mt-1 w-[calc(100%-48px)] bg-white border border-gray-200 rounded-md shadow-lg flex flex-col overflow-hidden">
+                              <div className="max-h-52 overflow-y-auto">
+                                {studentSuggestions.map((s) => {
+                                  const isSelected = selectedStudentsForShortlist.some(sel => sel._id === s._id);
+                                  return (
+                                    <div
+                                      key={s._id}
+                                      className="px-4 py-2 hover:bg-indigo-50 cursor-pointer flex items-center justify-between border-b last:border-0"
+                                      onClick={() => toggleStudentSelection(s)}
+                                    >
+                                      <div>
+                                        <div className="font-medium text-sm text-gray-900">{s.name}</div>
+                                        <div className="text-xs text-gray-500">{s.rollNumber} • {s.branch}</div>
+                                      </div>
+                                      {isSelected && <Check className="h-4 w-4 text-indigo-600" />}
                                     </div>
-                                    {isSelected && <Check className="h-4 w-4 text-indigo-600" />}
-                                  </div>
-                                );
-                              })}
+                                  );
+                                })}
+                              </div>
+                              <button
+                                className="w-full py-2 bg-gray-50 text-xs font-semibold text-gray-600 hover:bg-gray-100 hover:text-gray-900 border-t transition-colors"
+                                onClick={(e) => { e.preventDefault(); setStudentSearchTerm(""); setStudentSuggestions([]); }}
+                              >
+                                Close Suggestions
+                              </button>
                             </div>
                           )}
                         </div>

@@ -71,6 +71,10 @@ const addCompany = async (req, res) => {
   if (!name || day === undefined || !slot || !venue) {
     return res.status(400).json({ message: "Name, Day, Slot, and Venue are required fields" });
   }
+  const emojiRegex = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu;
+  if (emojiRegex.test(name) || emojiRegex.test(venue)) {
+    return res.status(400).json({ message: "Company name and venue cannot contain emojis" });
+  }
   try {
     const company = await Company.create(req.body);
     await emitStatsUpdate();
@@ -84,6 +88,11 @@ const addCompany = async (req, res) => {
 // @route   PUT /api/admin/companies/:id
 const updateCompany = async (req, res) => {
   try {
+    const { name, venue } = req.body;
+    const emojiRegex = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu;
+    if ((name && emojiRegex.test(name)) || (venue && emojiRegex.test(venue))) {
+      return res.status(400).json({ message: "Company name and venue cannot contain emojis" });
+    }
     const company = await Company.findByIdAndUpdate(req.params.id, req.body, { new: true });
     res.json(company);
   } catch (err) {
@@ -220,25 +229,42 @@ const addStudent = async (req, res) => {
   try {
     console.log("[addStudent] Request body:", JSON.stringify(req.body));
     const { name, rollNumber, email, phone } = req.body;
-    if (!name || !rollNumber || !email || !phone) return res.status(400).json({ message: "Name, Roll Number, Email ID, and Phone Number are required" });
+    if (!name || !name.trim() || !rollNumber || !String(rollNumber).trim() || !email || !phone) {
+      return res.status(400).json({ message: "Name, Roll Number, Email ID, and Phone Number are required" });
+    }
+
+    const finalName = name.trim();
+    if (!/^[A-Za-z0-9\s.\-]+$/.test(finalName)) {
+      return res.status(400).json({ message: "Student name can only contain letters, numbers, spaces, dots, and hyphens" });
+    }
+
+    const finalRollNumber = String(rollNumber).trim();
+    if (!/^[A-Za-z0-9]+$/.test(finalRollNumber)) {
+      return res.status(400).json({ message: "Roll Number can only contain letters and numbers" });
+    }
+
+    const finalEmail = email.toLowerCase().trim();
+    const emailRegex = /^[^\s@]+@(iitk\.ac\.in|gmail\.com)$/i;
+    if (!emailRegex.test(finalEmail)) {
+      return res.status(400).json({ message: `Invalid email domain: ${finalEmail}. Must be @iitk.ac.in or @gmail.com` });
+    }
 
     // Validate phone number format (must be 10 digits)
     const phoneRegex = /^\d{10}$/;
-    if (!phoneRegex.test(phone)) return res.status(400).json({ message: "Phone number must be exactly 10 digits" });
+    if (!phoneRegex.test(phone.trim())) return res.status(400).json({ message: "Phone number must be exactly 10 digits" });
 
-    const instituteId = rollNumber;
-    const finalEmail = email;
+    const instituteId = finalRollNumber;
 
     // Generate random 8-char password
     const generatedPassword = crypto.randomBytes(4).toString("hex");
 
     // Check if user already exists
     const existing = await User.findOne({ $or: [{ instituteId }, { email: finalEmail }] });
-    if (existing) return res.status(400).json({ message: `User with roll number "${rollNumber}" or email "${finalEmail}" already exists` });
+    if (existing) return res.status(400).json({ message: `User with roll number "${finalRollNumber}" or email "${finalEmail}" already exists` });
 
     // Check if student record already exists
-    const existingStudent = await Student.findOne({ rollNumber });
-    if (existingStudent) return res.status(400).json({ message: `Student with roll number "${rollNumber}" already exists` });
+    const existingStudent = await Student.findOne({ rollNumber: finalRollNumber });
+    if (existingStudent) return res.status(400).json({ message: `Student with roll number "${finalRollNumber}" already exists` });
 
     const user = await User.create({
       instituteId,
@@ -250,16 +276,16 @@ const addStudent = async (req, res) => {
 
     const student = await Student.create({
       userId: user._id,
-      name,
-      rollNumber,
-      phone,
+      name: finalName,
+      rollNumber: finalRollNumber,
+      phone: phone.trim(),
     });
 
     await emitStatsUpdate();
 
     let emailSent = false;
     try {
-      await sendWelcomeEmail(finalEmail, name, rollNumber, generatedPassword);
+      await sendWelcomeEmail(finalEmail, finalName, finalRollNumber, generatedPassword);
       emailSent = true;
     } catch (err) {
       console.error("[addStudent] Non-fatal error: Failed to send welcome email to", finalEmail, err);
@@ -361,6 +387,21 @@ const assignCoco = async (req, res) => {
 
     await Coordinator.findByIdAndUpdate(cocoId, { $addToSet: { assignedCompanies: companyId } });
     await Company.findByIdAndUpdate(companyId, { $addToSet: { assignedCocos: cocoId } });
+
+    const company = await Company.findById(companyId);
+    const { sendNotification } = require("../services/notification.service");
+    if (company && coco) {
+      await sendNotification({
+        recipientId: coco.userId,
+        senderId: req.user.id,
+        senderModel: "User",
+        source: "system",
+        companyId: companyId,
+        message: `You have been assigned as the Coordinator for ${company.name}`,
+        type: "general"
+      });
+    }
+
     res.json({ message: "CoCo assigned successfully" });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -532,6 +573,7 @@ const shortlistStudents = async (req, res) => {
       return res.status(404).json({ message: `No students found matching the provided roll numbers` });
     }
 
+    const newStudents = students.filter(s => !company.shortlistedStudents.some(id => id.toString() === s._id.toString()));
     const studentIds = students.map((s) => s._id);
 
     // Add students to company's shortlist (avoid duplicates)
@@ -544,6 +586,19 @@ const shortlistStudents = async (req, res) => {
       { _id: { $in: studentIds } },
       { $addToSet: { shortlistedCompanies: companyId } }
     );
+
+    const { sendNotification } = require("../services/notification.service");
+    await Promise.all(newStudents.map(s =>
+      sendNotification({
+        recipientId: s.userId,
+        senderId: req.user.id,
+        senderModel: "User",
+        source: "company",
+        companyId: companyId,
+        message: `You have been shortlisted for ${company.name}`,
+        type: "general"
+      }).catch(err => console.error("Notification failed", err))
+    ));
 
     res.json({
       message: `${students.length} student(s) shortlisted successfully`,
@@ -980,12 +1035,28 @@ const clearAllApcNotifications = async (req, res) => {
 const updateApcProfile = async (req, res) => {
   try {
     const { name, phone } = req.body;
+
+    // Add validation checks mapping to frontend constraints
+    if (name && !/^[A-Za-z0-9\s.\-]+$/.test(name.trim())) {
+      return res.status(400).json({ message: "APC name can only contain letters, numbers, spaces, dots, and hyphens" });
+    }
+    if (phone && !/^\d{10}$/.test(phone.trim())) {
+      return res.status(400).json({ message: "Phone number must be exactly 10 digits" });
+    }
+
+    const user = await User.findById(req.user.id);
+
     const updated = await Apc.findOneAndUpdate(
       { userId: req.user.id },
-      { ...(name !== undefined && { name }), ...(phone !== undefined && { contact: phone }) },
-      { new: true }
+      {
+        $set: {
+          ...(name !== undefined && { name: name.trim() }),
+          ...(phone !== undefined && { contact: phone.trim() })
+        },
+        $setOnInsert: { userId: req.user.id, rollNumber: user?.instituteId || "admin_generated" }
+      },
+      { new: true, upsert: true }
     );
-    if (!updated) return res.status(404).json({ message: "APC profile not found" });
     res.json({ message: "Profile updated", apc: updated });
   } catch (err) {
     res.status(500).json({ message: err.message });

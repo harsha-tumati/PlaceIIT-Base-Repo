@@ -80,6 +80,11 @@ export function CoCoProfilePage({ userId }: { userId: string }) {
   useEffect(() => { fetchProfile(); }, [fetchProfile]);
 
   const handleSave = async () => {
+    if (profileData.phone && !/^\d{10}$/.test(profileData.phone)) {
+      toast.error("Phone number must be exactly 10 digits");
+      return;
+    }
+
     setSaving(true);
     try {
       await cocoApi.updateProfile({ name: profileData.name, contact: profileData.phone });

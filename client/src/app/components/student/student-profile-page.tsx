@@ -67,6 +67,27 @@ export function StudentProfilePage({ rollNo }: { rollNo: string }) {
     setProfileData((prev) => ({ ...prev, [key]: e.target.value }));
 
   const handleSave = async () => {
+    if (profileData.phone && !/^\d{10}$/.test(profileData.phone)) {
+      toast.error("Phone number must be exactly 10 digits");
+      return;
+    }
+    if (profileData.emergencyContactName && !/^[A-Za-z0-9\s.\-]+$/.test(profileData.emergencyContactName.trim())) {
+      toast.error("Emergency contact name can only contain letters, numbers, spaces, dots, and hyphens");
+      return;
+    }
+    if (profileData.emergencyContactPhone && !/^\d{10}$/.test(profileData.emergencyContactPhone)) {
+      toast.error("Emergency contact phone must be exactly 10 digits");
+      return;
+    }
+    if (profileData.friendContactName && !/^[A-Za-z0-9\s.\-]+$/.test(profileData.friendContactName.trim())) {
+      toast.error("Friend contact name can only contain letters, numbers, spaces, dots, and hyphens");
+      return;
+    }
+    if (profileData.friendContactPhone && !/^\d{10}$/.test(profileData.friendContactPhone)) {
+      toast.error("Friend contact phone must be exactly 10 digits");
+      return;
+    }
+
     setSaving(true);
     try {
       await studentApi.updateProfile({

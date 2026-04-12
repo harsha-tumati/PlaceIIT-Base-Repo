@@ -56,8 +56,19 @@ export function APCProfilePage({ userName, userId }: APCProfilePageProps) {
   }, []);
 
   const handleSaveProfile = async () => {
+    const trimmedPhone = phone.trim();
+    if (trimmedPhone && !/^\d{10}$/.test(trimmedPhone)) {
+      toast.error("Phone number must be exactly 10 digits");
+      return;
+    }
+    const trimmedName = name.trim();
+    if (trimmedName && !/^[A-Za-z0-9\s.\-]+$/.test(trimmedName)) {
+      toast.error("APC name can only contain letters, numbers, spaces, dots, and hyphens");
+      return;
+    }
+
     try {
-      await adminApi.updateProfile({ name, phone });
+      await adminApi.updateProfile({ name: trimmedName, phone: trimmedPhone });
       toast.success("Profile updated successfully!");
       setIsEditingProfile(false);
     } catch (err: any) {
@@ -318,28 +329,7 @@ export function APCProfilePage({ userName, userId }: APCProfilePageProps) {
             </CardContent>
           </Card>
 
-          {/* Account Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Account Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between py-2">
-                <span className="text-gray-600">Account Type</span>
-                <span className="font-medium text-gray-900">Administrator</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between py-2">
-                <span className="text-gray-600">Account Status</span>
-                <span className="font-medium text-green-600">Active</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between py-2">
-                <span className="text-gray-600">Member Since</span>
-                <span className="font-medium text-gray-900">{joinDate || "N/A"}</span>
-              </div>
-            </CardContent>
-          </Card>
+
         </div>
       </div>
     </div>

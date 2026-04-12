@@ -152,6 +152,16 @@ const processShortlistExcel = async (uploadId, filePath, companyId) => {
       await Student.findByIdAndUpdate(student._id, { $addToSet: { shortlistedCompanies: companyId } });
       existingIds.add(student._id.toString());
       successCount++;
+
+      const { sendNotification } = require("./notification.service");
+      await sendNotification({
+        recipientId: student.userId,
+        senderModel: "User",
+        source: "company",
+        companyId: companyId,
+        message: `You have been shortlisted for ${company.name}`,
+        type: "general"
+      }).catch(err => console.error("Notification failed:", err));
     }
 
     await ExcelUpload.findByIdAndUpdate(uploadId, {

@@ -17,33 +17,33 @@ const queueRoutes = require("./routes/queue.routes");
 
 // Init
 connectDB().then(() => {
-const app = express();
-const server = http.createServer(app);
-const io = initSocket(server);
-registerQueueSocketHandlers(io);
+  const app = express();
+  const server = http.createServer(app);
+  const io = initSocket(server);
+  registerQueueSocketHandlers(io);
 
-// Middlewares
-app.use(cors({ origin: CLIENT_URL, credentials: true }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use("/uploads", express.static("uploads"));
+  // Middlewares
+  app.use(cors({ origin: CLIENT_URL, credentials: true }));
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+  app.use("/uploads", express.static("uploads"));
 
-// API Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/student", studentRoutes);
-app.use("/api/coco", cocoRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/company", companyRoutes);
-app.use("/api/queue", queueRoutes);
+  // API Routes
+  app.use("/api/auth", authRoutes);
+  app.use("/api/student", studentRoutes);
+  app.use("/api/coco", cocoRoutes);
+  app.use("/api/admin", adminRoutes);
+  app.use("/api/company", companyRoutes);
+  app.use("/api/queue", queueRoutes);
 
-// Health check
-app.get("/api/health", (req, res) => res.json({ status: "OK", timestamp: new Date() }));
+  // Health check
+  app.get("/api/health", (req, res) => res.json({ status: "OK", timestamp: new Date() }));
 
-// Error handling
-app.use(notFound);
-app.use(errorHandler);
+  // Error handling
+  app.use(notFound);
+  app.use(errorHandler);
 
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV} mode`);
-});
+  server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV} mode`);
+  });
 });

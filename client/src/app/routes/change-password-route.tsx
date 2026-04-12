@@ -26,6 +26,11 @@ export function ChangePasswordRoute() {
       toast.error("Password must be at least 6 characters long.");
       return;
     }
+    const emojiRegex = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu;
+    if (emojiRegex.test(newPassword)) {
+      toast.error("Password cannot contain emojis.");
+      return;
+    }
     if (newPassword !== confirmPassword) {
       toast.error("Passwords do not match.");
       return;
@@ -34,8 +39,16 @@ export function ChangePasswordRoute() {
       toast.error("Emergency contact fields are required.");
       return;
     }
+    if (!/^[A-Za-z0-9\s.\-]+$/.test(emergencyContactName.trim())) {
+      toast.error("Emergency contact name can only contain letters, numbers, spaces, dots, and hyphens.");
+      return;
+    }
     if (!/^\d{10}$/.test(emergencyContactPhone.trim())) {
       toast.error("Emergency contact phone number must be exactly 10 digits.");
+      return;
+    }
+    if (friendContactName.trim() && !/^[A-Za-z0-9\s.\-]+$/.test(friendContactName.trim())) {
+      toast.error("Friend contact name can only contain letters, numbers, spaces, dots, and hyphens.");
       return;
     }
     if (friendContactPhone.trim() && !/^\d{10}$/.test(friendContactPhone.trim())) {
@@ -57,16 +70,16 @@ export function ChangePasswordRoute() {
       });
       // Update local storage / context if necessary, or just force them to log in again
       if (res.user) {
-         // Optionally update the context here, but simplest is to redirect to portal
-         // We successfully changed it. Let's redirect them based on their role
-         toast.success("Password changed successfully!");
-         const role = res.user.role || auth.userRole;
-         if (role === 'apc') navigate("/apc");
-         else if (role === 'coco') navigate("/coco");
-         else navigate("/student");
+        // Optionally update the context here, but simplest is to redirect to portal
+        // We successfully changed it. Let's redirect them based on their role
+        toast.success("Password changed successfully!");
+        const role = res.user.role || auth.userRole;
+        if (role === 'apc') navigate("/apc");
+        else if (role === 'coco') navigate("/coco");
+        else navigate("/student");
 
-         // Also tell the auth context they changed it
-         auth.setUserMustChangePassword?.(false);
+        // Also tell the auth context they changed it
+        auth.setUserMustChangePassword?.(false);
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to change password.");
