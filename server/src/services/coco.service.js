@@ -11,13 +11,13 @@ const createCoco = async (data) => {
   }
 
   const finalName = name.trim();
-  if (!/^[A-Za-z0-9\s.\-]+$/.test(finalName)) {
-    throw new Error("CoCo name can only contain letters, numbers, spaces, dots, and hyphens");
+  if (!finalName || !/^[A-Za-z\s]+$/.test(finalName)) {
+    throw new Error("CoCo name can only contain letters and spaces");
   }
 
   const finalRollNumber = String(rollNumber).trim();
-  if (!/^[A-Za-z0-9]+$/.test(finalRollNumber)) {
-    throw new Error("Roll Number can only contain letters and numbers");
+  if (!/^\d+$/.test(finalRollNumber)) {
+    throw new Error("Roll Number can only contain digits");
   }
 
   // Validate email format

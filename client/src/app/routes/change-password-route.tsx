@@ -39,17 +39,25 @@ export function ChangePasswordRoute() {
       toast.error("Emergency contact fields are required.");
       return;
     }
-    if (!/^[A-Za-z0-9\s.\-]+$/.test(emergencyContactName.trim())) {
-      toast.error("Emergency contact name can only contain letters, numbers, spaces, dots, and hyphens.");
+    const trimmedECN = emergencyContactName.trim();
+    if (!trimmedECN) {
+      toast.error("Emergency contact name cannot be just spaces.");
+      return;
+    }
+    if (!/^[A-Za-z\s]+$/.test(trimmedECN)) {
+      toast.error("Emergency contact name can only contain letters and spaces.");
       return;
     }
     if (!/^\d{10}$/.test(emergencyContactPhone.trim())) {
       toast.error("Emergency contact phone number must be exactly 10 digits.");
       return;
     }
-    if (friendContactName.trim() && !/^[A-Za-z0-9\s.\-]+$/.test(friendContactName.trim())) {
-      toast.error("Friend contact name can only contain letters, numbers, spaces, dots, and hyphens.");
-      return;
+    if (friendContactName.trim()) {
+      const trimmedFCN = friendContactName.trim();
+      if (!/^[A-Za-z\s]+$/.test(trimmedFCN)) {
+        toast.error("Friend contact name can only contain letters and spaces.");
+        return;
+      }
     }
     if (friendContactPhone.trim() && !/^\d{10}$/.test(friendContactPhone.trim())) {
       toast.error("Friend contact phone number must be exactly 10 digits.");

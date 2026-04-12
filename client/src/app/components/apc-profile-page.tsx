@@ -62,9 +62,11 @@ export function APCProfilePage({ userName, userId }: APCProfilePageProps) {
       return;
     }
     const trimmedName = name.trim();
-    if (trimmedName && !/^[A-Za-z0-9\s.\-]+$/.test(trimmedName)) {
-      toast.error("APC name can only contain letters, numbers, spaces, dots, and hyphens");
-      return;
+    if (trimmedName) {
+      if (!/^[A-Za-z\s]+$/.test(trimmedName)) {
+        toast.error("APC name can only contain letters and spaces");
+        return;
+      }
     }
 
     try {

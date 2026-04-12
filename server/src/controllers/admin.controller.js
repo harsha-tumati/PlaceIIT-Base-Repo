@@ -234,8 +234,8 @@ const addStudent = async (req, res) => {
     }
 
     const finalName = name.trim();
-    if (!/^[A-Za-z0-9\s.\-]+$/.test(finalName)) {
-      return res.status(400).json({ message: "Student name can only contain letters, numbers, spaces, dots, and hyphens" });
+    if (!finalName || !/^[A-Za-z\s]+$/.test(finalName)) {
+      return res.status(400).json({ message: "Student name can only contain letters and spaces" });
     }
 
     const finalRollNumber = String(rollNumber).trim();
@@ -1037,8 +1037,11 @@ const updateApcProfile = async (req, res) => {
     const { name, phone } = req.body;
 
     // Add validation checks mapping to frontend constraints
-    if (name && !/^[A-Za-z0-9\s.\-]+$/.test(name.trim())) {
-      return res.status(400).json({ message: "APC name can only contain letters, numbers, spaces, dots, and hyphens" });
+    if (name !== undefined) {
+      const trimmedName = name.trim();
+      if (!trimmedName || !/^[A-Za-z\s]+$/.test(trimmedName)) {
+        return res.status(400).json({ message: "APC name can only contain letters and spaces" });
+      }
     }
     if (phone && !/^\d{10}$/.test(phone.trim())) {
       return res.status(400).json({ message: "Phone number must be exactly 10 digits" });
