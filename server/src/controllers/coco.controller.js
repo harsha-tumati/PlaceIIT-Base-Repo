@@ -105,16 +105,13 @@ const getShortlistedStudents = async (req, res) => {
       status: { $in: ["in_queue", "in_interview", "on_hold", "pending"] }
     }).populate("companyId", "name");
 
-    // 4. Attach queue status
-    const students = allStudents.map((s) => {
+    // 4. Attach ALL queue statuses (expand student array)
+    const students = [];
+
+    allStudents.forEach((s) => {
       const studentQueueEntries = allQueueEntries.filter(
         qe => qe.studentId && qe.studentId._id && qe.studentId._id.toString() === s._id.toString()
       );
-
-      const activeQueueEntry = studentQueueEntries.find((entry) => ACTIVE_QUEUE_STATUSES.includes(entry.status));
-      const q = activeQueueEntry
-        || studentQueueEntries.sort((a, b) => getQueueEntryPriority(b) - getQueueEntryPriority(a))[0]
-        || null;
 
       const sObj = typeof s.toObject === "function" ? s.toObject() : { ...s };
 
@@ -129,7 +126,13 @@ const getShortlistedStudents = async (req, res) => {
         sObj.queuedFor = !sObj.inInterview ? globalQueue.companyId.name : undefined;
       }
 
-      return { ...sObj, queueEntry: q };
+      if (studentQueueEntries.length > 0) {
+        studentQueueEntries.forEach(q => {
+          students.push({ ...sObj, queueEntry: q });
+        });
+      } else {
+        students.push({ ...sObj, queueEntry: null });
+      }
     });
 
     res.json(students);
