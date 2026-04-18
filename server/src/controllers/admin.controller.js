@@ -13,6 +13,7 @@ const Apc = require("../models/Apc.model");
 const DriveState = require("../models/DriveState.model");
 const Notification = require("../models/Notification.model");
 const { SOCKET_EVENTS } = require("../utils/constants");
+const queueService = require("../services/queue.service");
 
 const emitStatsUpdate = async () => {
   try {
@@ -628,6 +629,13 @@ const shortlistStudents = async (req, res) => {
       { $addToSet: { shortlistedCompanies: companyId } }
     );
 
+    for (const studentId of studentIds) {
+      try {
+        await queueService.ensureShortlistedStudentInQueue(studentId, companyId);
+      } catch (err) {
+        console.error("Error ensuring student in queue:", err);
+      }
+    }
     const { sendNotification } = require("../services/notification.service");
     await Promise.all(newStudents.map(s =>
       sendNotification({
@@ -640,7 +648,6 @@ const shortlistStudents = async (req, res) => {
         type: "general"
       }).catch(err => console.error("Notification failed", err))
     ));
-
     res.json({
       message: `${students.length} student(s) shortlisted successfully`,
       shortlisted: students.map((s) => ({ name: s.name, rollNumber: s.rollNumber })),
