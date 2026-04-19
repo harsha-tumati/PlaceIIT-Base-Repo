@@ -36,7 +36,7 @@ interface APCNavbarProps {
 export function APCNavbar({ onNavigate, userName = "Admin", isMainAdmin, unreadNotifications = 0 }: APCNavbarProps) {
   return (
     <nav className="bg-white border-b border-gray-200 shadow-sm">
-      <div className="container mx-auto px-8 py-3.5">
+      <div className="container mx-auto px-4 sm:px-8 py-3.5">
         <div className="flex items-center justify-between">
           <button
             onClick={() => onNavigate?.('home')}
@@ -70,6 +70,15 @@ export function APCNavbar({ onNavigate, userName = "Admin", isMainAdmin, unreadN
               CoCos
             </button>
 
+            {isMainAdmin && (
+              <button
+                onClick={() => onNavigate?.('manage-apcs')}
+                className="text-gray-500 hover:text-gray-900 transition-colors font-medium"
+              >
+                APCs
+              </button>
+            )}
+
             <button
               onClick={() => onNavigate?.('manage-companies')}
               className="text-gray-500 hover:text-gray-900 transition-colors font-medium"
@@ -83,15 +92,6 @@ export function APCNavbar({ onNavigate, userName = "Admin", isMainAdmin, unreadN
             >
               Queries
             </button>
-
-            {isMainAdmin && (
-              <button
-                onClick={() => onNavigate?.('manage-apcs')}
-                className="text-emerald-600 hover:text-emerald-700 transition-colors font-medium flex items-center gap-1"
-              >
-                APCs
-              </button>
-            )}
 
             <div className="flex items-center gap-3 ml-4 pl-4 border-l border-gray-200">
               {/* Notification Bell */}
@@ -171,6 +171,48 @@ export function APCNavbar({ onNavigate, userName = "Admin", isMainAdmin, unreadN
               </AlertDialog>
             </div>
           </div>
+        </div>
+
+        {/* Mobile Navigation strip */}
+        <div className="md:hidden border-t border-gray-200 py-2 flex overflow-x-auto space-x-1">
+          <button
+            onClick={() => onNavigate?.('home')}
+            className="text-gray-700 hover:text-indigo-600 text-sm font-medium px-3 py-1.5 rounded hover:bg-indigo-50 whitespace-nowrap"
+          >
+            Home
+          </button>
+          <button
+            onClick={() => onNavigate?.('student-search')}
+            className="text-gray-700 hover:text-indigo-600 text-sm font-medium px-3 py-1.5 rounded hover:bg-indigo-50 whitespace-nowrap"
+          >
+            Students
+          </button>
+          <button
+            onClick={() => onNavigate?.('manage-cocos')}
+            className="text-gray-700 hover:text-indigo-600 text-sm font-medium px-3 py-1.5 rounded hover:bg-indigo-50 whitespace-nowrap"
+          >
+            CoCos
+          </button>
+          {isMainAdmin && (
+            <button
+              onClick={() => onNavigate?.('manage-apcs')}
+              className="text-gray-700 hover:text-indigo-600 text-sm font-medium px-3 py-1.5 rounded hover:bg-indigo-50 whitespace-nowrap"
+            >
+              APCs
+            </button>
+          )}
+          <button
+            onClick={() => onNavigate?.('manage-companies')}
+            className="text-gray-700 hover:text-indigo-600 text-sm font-medium px-3 py-1.5 rounded hover:bg-indigo-50 whitespace-nowrap"
+          >
+            Companies
+          </button>
+          <button
+            onClick={() => onNavigate?.('queries')}
+            className="text-gray-700 hover:text-indigo-600 text-sm font-medium px-3 py-1.5 rounded hover:bg-indigo-50 whitespace-nowrap"
+          >
+            Queries
+          </button>
         </div>
       </div>
     </nav>

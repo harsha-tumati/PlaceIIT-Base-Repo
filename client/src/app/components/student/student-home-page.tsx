@@ -273,7 +273,7 @@ export function StudentHomePage() {
     return (
       <Card key={`${company.id}-${company.round}`} className={`transition-all ${getCardClass(s)}`}>
         <CardHeader className="pb-3">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div className="flex items-start space-x-3 flex-1">
               <div className="h-12 w-12 rounded-lg bg-white border border-gray-200 flex items-center justify-center flex-shrink-0">
                 {company.logo ? (
@@ -289,23 +289,23 @@ export function StudentHomePage() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2 mb-1">
-                  <CardTitle className="text-xl text-gray-900">{company.name}</CardTitle>
+                  <CardTitle className="text-lg sm:text-xl text-gray-900">{company.name}</CardTitle>
                   {!company.isWalkin && <Badge variant="outline" className="text-xs">{company.round}</Badge>}
                   {getStatusBadge(s)}
                 </div>
                 {company.role && <p className="text-sm text-gray-600 mb-1">{company.role}</p>}
               </div>
             </div>
-            {/* Header Action Button */}
-            <div className="shrink-0 flex flex-col items-end gap-2">
+            {/* Action Button — full width on mobile */}
+            <div className="w-full sm:w-auto sm:shrink-0 flex sm:flex-col sm:items-end gap-2">
               {canJoin && (
-                <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white min-w-[110px]"
+                <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto sm:min-w-[110px]"
                   onClick={() => handleJoinQueue(company)} disabled={busy}>
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><LogIn className="h-4 w-4 mr-1" />Join Queue</>}
                 </Button>
               )}
               {s === "pending" && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
                   <div className="flex items-center text-sm font-medium text-yellow-700 bg-yellow-50 border border-yellow-300 rounded-md h-9 px-3">
                     <Clock3 className="h-4 w-4 mr-1" />Requested
                   </div>
@@ -334,7 +334,7 @@ export function StudentHomePage() {
                 </div>
               )}
               {(s === "in_queue" || s === "in-queue" || s === "on_hold") && (
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 w-full sm:w-auto">
                   <div className={`flex flex-col items-center rounded-md px-3 py-1 mr-2 ${s === "on_hold" ? "bg-red-50 border border-red-200" : "bg-blue-50 border border-blue-200"
                     }`}>
                     <span className={`text-[10px] uppercase font-bold tracking-wider ${s === "on_hold" ? "text-red-600" : "text-blue-600"
@@ -348,7 +348,7 @@ export function StudentHomePage() {
                   </div>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button size="sm" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50 min-w-[110px] h-10" disabled={busy}>
+                      <Button size="sm" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50 flex-1 sm:flex-none sm:min-w-[110px] h-10" disabled={busy}>
                         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><LogOut className="h-4 w-4 mr-1" />Exit Queue</>}
                       </Button>
                     </AlertDialogTrigger>
@@ -449,8 +449,8 @@ export function StudentHomePage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold text-gray-900 flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 flex items-center gap-3">
           <Building2 className="h-6 w-6 text-indigo-600" />
           {currentDay}
           {driveSlot && (
@@ -459,8 +459,8 @@ export function StudentHomePage() {
             </Badge>
           )}
         </h2>
-        <Button variant="outline" onClick={scrollToWalkin} className="border-green-600 text-green-600 hover:bg-green-50">
-          <Building2 className="h-4 w-4 mr-2" /> Walk-in Companies
+        <Button variant="outline" onClick={scrollToWalkin} className="border-green-600 text-green-600 hover:bg-green-50 text-sm">
+          <Building2 className="h-4 w-4 mr-2" /> Walk-in
         </Button>
       </div>
 

@@ -6,7 +6,7 @@ import { Badge } from "@/app/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/app/components/ui/dialog";
 import { Label } from "@/app/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
-import { ArrowLeft, UserPlus, Users, Clock, CheckCircle, AlertCircle, Upload, Loader2, Flag, PlayCircle, Bell, XCircle } from "lucide-react";
+import { ArrowLeft, UserPlus, Users, Clock, CheckCircle, AlertCircle, Upload, Loader2, Flag, PlayCircle, Bell, XCircle, Plus, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
 import { cocoApi } from "@/app/lib/api";
 import { useSocket } from "@/app/socket-context";
@@ -122,6 +122,7 @@ export function RoundTrackingPage({ companyName, onBack }: RoundTrackingPageProp
   const [uploadingExcel, setUploadingExcel] = useState(false);
   const [excelRound, setExcelRound] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [addingRound, setAddingRound] = useState(false);
 
   // Pending requests state
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
@@ -368,6 +369,48 @@ export function RoundTrackingPage({ companyName, onBack }: RoundTrackingPageProp
     }
   };
 
+  const handleAddRound = async () => {
+    if (!companyId) return;
+    setAddingRound(true);
+    try {
+      const res: any = await cocoApi.incrementTotalRounds(companyId);
+      const newTotal = res.totalRounds;
+      // Ensure we never visually go backwards if DB was behind the UI floor of 3
+      const effectiveTotal = Math.max(totalRounds + 1, newTotal);
+      setTotalRounds(effectiveTotal);
+      setStudentsByRound(prev => ({ ...prev, [effectiveTotal]: [] }));
+      setPanelsByRound(prev => ({ ...prev, [effectiveTotal]: [] }));
+      setExcelRound(effectiveTotal);
+      toast.success(`Round ${effectiveTotal} added!`);
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to add round");
+    } finally {
+      setAddingRound(false);
+    }
+  };
+
+  const handleDeleteRound = async (round: number) => {
+    if (!companyId) return;
+    try {
+      await cocoApi.deleteRound(companyId, round);
+      setTotalRounds(prev => Math.max(3, prev - 1));
+      setStudentsByRound(prev => {
+        const next = { ...prev };
+        delete next[round];
+        return next;
+      });
+      setPanelsByRound(prev => {
+        const next = { ...prev };
+        delete next[round];
+        return next;
+      });
+      if (excelRound === round) setExcelRound(round - 1);
+      toast.success(`Round ${round} removed.`);
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to delete round");
+    }
+  };
+
   const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -465,10 +508,25 @@ export function RoundTrackingPage({ companyName, onBack }: RoundTrackingPageProp
         <CardHeader className="bg-[#f8fafc] border-b shrink-0 py-3">
           <CardTitle className="flex items-center justify-between text-base">
             <span className="font-bold text-gray-800">Round {round}</span>
-            <Badge variant="secondary" className="bg-white border text-gray-700 font-medium px-3 flex items-center shadow-sm">
-              <Users className="h-3 w-3 mr-1.5 text-gray-400" />
-              {students.length} Students
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="bg-white border text-gray-700 font-medium px-3 flex items-center shadow-sm">
+                <Users className="h-3 w-3 mr-1.5 text-gray-400" />
+                {students.length} Students
+              </Badge>
+              {round > 3 && (
+                <button
+                  title={students.length === 0 ? "Delete this round" : "Remove all students first to delete"}
+                  disabled={students.length > 0}
+                  onClick={() => handleDeleteRound(round)}
+                  className={`p-1 rounded transition-colors ${students.length === 0
+                      ? "text-red-500 hover:bg-red-50 cursor-pointer"
+                      : "text-gray-300 cursor-not-allowed"
+                    }`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+            </div>
           </CardTitle>
         </CardHeader>
 
@@ -535,7 +593,7 @@ export function RoundTrackingPage({ companyName, onBack }: RoundTrackingPageProp
   }
 
   return (
-    <div className="space-y-6 h-[calc(100vh-8rem)] flex flex-col">
+    <div className="space-y-6">
       <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center space-x-4">
           <Button variant="ghost" className="hover:bg-gray-100" onClick={onBack}><ArrowLeft className="h-5 w-5" /></Button>
@@ -544,135 +602,146 @@ export function RoundTrackingPage({ companyName, onBack }: RoundTrackingPageProp
             <p className="text-sm font-medium text-gray-500 mt-1">{companyName}</p>
           </div>
         </div>
-        <Dialog open={isAddStudentOpen} onOpenChange={setIsAddStudentOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-green-600 hover:bg-green-700 shadow-sm"><UserPlus className="h-4 w-4 mr-2" />Add Students</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Add Students to Round</DialogTitle>
-              <DialogDescription>Add students manually or upload an Excel file</DialogDescription>
-            </DialogHeader>
-            <Tabs defaultValue="manual" className="w-full pt-4">
-              <TabsList className="grid w-full grid-cols-2 mb-4">
-                <TabsTrigger value="manual">Manual Entry</TabsTrigger>
-                <TabsTrigger value="excel">Excel Upload</TabsTrigger>
-              </TabsList>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            className="border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+            onClick={handleAddRound}
+            disabled={addingRound || !companyId}
+          >
+            {addingRound ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+            Add Round
+          </Button>
+          <Dialog open={isAddStudentOpen} onOpenChange={setIsAddStudentOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-green-600 hover:bg-green-700 shadow-sm"><UserPlus className="h-4 w-4 mr-2" />Add Students</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Add Students to Round</DialogTitle>
+                <DialogDescription>Add students manually or upload an Excel file</DialogDescription>
+              </DialogHeader>
+              <Tabs defaultValue="manual" className="w-full pt-4">
+                <TabsList className="grid w-full grid-cols-2 mb-4">
+                  <TabsTrigger value="manual">Manual Entry</TabsTrigger>
+                  <TabsTrigger value="excel">Excel Upload</TabsTrigger>
+                </TabsList>
 
-              <TabsContent value="manual" className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Round</Label>
-                  <Select value={String(excelRound)} onValueChange={(v) => setExcelRound(parseInt(v))}>
-                    <SelectTrigger className="bg-gray-50"><SelectValue placeholder="Select Round" /></SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: totalRounds }, (_, i) => i + 1).map((r) => (
-                        <SelectItem key={r} value={String(r)}>{r}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <TabsContent value="manual" className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Round</Label>
+                    <Select value={String(excelRound)} onValueChange={(v) => setExcelRound(parseInt(v))}>
+                      <SelectTrigger className="bg-gray-50"><SelectValue placeholder="Select Round" /></SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: totalRounds }, (_, i) => i + 1).map((r) => (
+                          <SelectItem key={r} value={String(r)}>{r}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div className="space-y-2">
-                  <Label className="text-gray-500">Status</Label>
-                  <Select value={manualStatus} onValueChange={setManualStatus} disabled>
-                    <SelectTrigger className="bg-gray-100 cursor-not-allowed text-gray-500">
-                      <SelectValue placeholder="Select Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="yet-to-interview">Yet to be Interviewed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                  <div className="space-y-2">
+                    <Label className="text-gray-500">Status</Label>
+                    <Select value={manualStatus} onValueChange={setManualStatus} disabled>
+                      <SelectTrigger className="bg-gray-100 cursor-not-allowed text-gray-500">
+                        <SelectValue placeholder="Select Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="yet-to-interview">Yet to be Interviewed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div className="space-y-2 relative">
-                  <Label>Student Name or Roll Number</Label>
-                  <Input
-                    placeholder="Search by name or roll number"
-                    className="bg-gray-50"
-                    value={manualStudentInput}
-                    onChange={(e) => {
-                      setManualStudentInput(e.target.value);
-                      setSelectedStudent(null);
-                    }}
-                    onFocus={() => {
-                      if (searchResults.length > 0) setShowDropdown(true);
-                    }}
-                    onBlur={() => {
-                      // Delay hiding dropdown so click can register
-                      setTimeout(() => setShowDropdown(false), 200);
-                    }}
-                  />
-                  {showDropdown && searchResults.length > 0 && (
-                    <div className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto mt-1 top-[60px]">
-                      {searchResults.map((s) => (
-                        <div
-                          key={s._id}
-                          className="px-4 py-2 hover:bg-green-50 cursor-pointer border-b last:border-0"
-                          onClick={() => {
-                            setSelectedStudent(s);
-                            setManualStudentInput(`${s.name} (${s.rollNumber})`);
-                            setShowDropdown(false);
-                          }}
-                        >
-                          <div className="font-medium text-gray-900">{s.name}</div>
-                          <div className="text-xs text-gray-500">{s.rollNumber} • {s.email || "No email"}</div>
-                        </div>
-                      ))}
+                  <div className="space-y-2 relative">
+                    <Label>Student Name or Roll Number</Label>
+                    <Input
+                      placeholder="Search by name or roll number"
+                      className="bg-gray-50"
+                      value={manualStudentInput}
+                      onChange={(e) => {
+                        setManualStudentInput(e.target.value);
+                        setSelectedStudent(null);
+                      }}
+                      onFocus={() => {
+                        if (searchResults.length > 0) setShowDropdown(true);
+                      }}
+                      onBlur={() => {
+                        // Delay hiding dropdown so click can register
+                        setTimeout(() => setShowDropdown(false), 200);
+                      }}
+                    />
+                    {showDropdown && searchResults.length > 0 && (
+                      <div className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto mt-1 top-[60px]">
+                        {searchResults.map((s) => (
+                          <div
+                            key={s._id}
+                            className="px-4 py-2 hover:bg-green-50 cursor-pointer border-b last:border-0"
+                            onClick={() => {
+                              setSelectedStudent(s);
+                              setManualStudentInput(`${s.name} (${s.rollNumber})`);
+                              setShowDropdown(false);
+                            }}
+                          >
+                            <div className="font-medium text-gray-900">{s.name}</div>
+                            <div className="text-xs text-gray-500">{s.rollNumber} • {s.email || "No email"}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <Button
+                    className="w-full bg-green-600 hover:bg-green-700"
+                    onClick={handleManualAdd}
+                    disabled={uploadingExcel}
+                  >
+                    {uploadingExcel ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Add Student
+                  </Button>
+                </TabsContent>
+
+                <TabsContent value="excel" className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Round</Label>
+                    <Select value={String(excelRound)} onValueChange={(v) => setExcelRound(parseInt(v))}>
+                      <SelectTrigger className="bg-gray-50">
+                        <SelectValue placeholder="Select Round" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: totalRounds }, (_, i) => i + 1).map((r) => (
+                          <SelectItem key={r} value={String(r)}>{r}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div
+                    className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors bg-gray-50"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="h-8 w-8 mx-auto mb-3 text-gray-400" />
+                    <p className="text-sm font-medium text-gray-700 mb-1">Click to browse or drag and drop</p>
+                    <p className="text-xs text-gray-500">Excel file (.xlsx or .xls)</p>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      className="hidden"
+                      accept=".xlsx,.xls"
+                      onChange={handleExcelUpload}
+                    />
+                  </div>
+                  <div className="bg-blue-50 p-3 rounded-lg text-xs text-blue-800 border border-blue-100">
+                    <strong>Format requirement:</strong> The Excel file must contain a column named exactly <code>Roll Number</code>.
+                  </div>
+                  {uploadingExcel && (
+                    <div className="flex items-center justify-center gap-2 text-indigo-600 font-medium text-sm">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Uploading securely…
                     </div>
                   )}
-                </div>
-
-                <Button
-                  className="w-full bg-green-600 hover:bg-green-700"
-                  onClick={handleManualAdd}
-                  disabled={uploadingExcel}
-                >
-                  {uploadingExcel ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  Add Student
-                </Button>
-              </TabsContent>
-
-              <TabsContent value="excel" className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Round</Label>
-                  <Select value={String(excelRound)} onValueChange={(v) => setExcelRound(parseInt(v))}>
-                    <SelectTrigger className="bg-gray-50">
-                      <SelectValue placeholder="Select Round" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: totalRounds }, (_, i) => i + 1).map((r) => (
-                        <SelectItem key={r} value={String(r)}>{r}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div
-                  className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors bg-gray-50"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload className="h-8 w-8 mx-auto mb-3 text-gray-400" />
-                  <p className="text-sm font-medium text-gray-700 mb-1">Click to browse or drag and drop</p>
-                  <p className="text-xs text-gray-500">Excel file (.xlsx or .xls)</p>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    className="hidden"
-                    accept=".xlsx,.xls"
-                    onChange={handleExcelUpload}
-                  />
-                </div>
-                <div className="bg-blue-50 p-3 rounded-lg text-xs text-blue-800 border border-blue-100">
-                  <strong>Format requirement:</strong> The Excel file must contain a column named exactly <code>Roll Number</code>.
-                </div>
-                {uploadingExcel && (
-                  <div className="flex items-center justify-center gap-2 text-indigo-600 font-medium text-sm">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Uploading securely…
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-          </DialogContent>
-        </Dialog>
+                </TabsContent>
+              </Tabs>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Pending Requests Panel */}
@@ -727,10 +796,10 @@ export function RoundTrackingPage({ companyName, onBack }: RoundTrackingPageProp
         </Card>
       )}
 
-      <div className="flex flex-1 overflow-x-auto min-h-0 pt-2 pb-4 scroll-smooth">
-        <div className="flex flex-1 w-full gap-6">
-          {Array.from({ length: Math.min(totalRounds, 5) }, (_, i) => i + 1).map((round) => (
-            <div key={round} className="flex-1 h-full min-h-0 flex flex-col">{renderRoundColumn(round)}</div>
+      <div className="overflow-x-auto pb-4 scroll-smooth" style={{ height: "calc(100vh - 14rem)" }}>
+        <div className="flex gap-6" style={{ minWidth: `${totalRounds * 370}px` }}>
+          {Array.from({ length: totalRounds }, (_, i) => i + 1).map((round) => (
+            <div key={round} className="flex-none w-[350px] h-full min-h-0 flex flex-col">{renderRoundColumn(round)}</div>
           ))}
         </div>
       </div>

@@ -71,7 +71,7 @@ export function APCLayout() {
     return (
         <div className="min-h-screen bg-gray-50">
             <APCNavbar onNavigate={handleNavigate} userName={auth.userName} isMainAdmin={auth.isMainAdmin} unreadNotifications={auth.apcUnreadNotificationsCount} />
-            <main className="container mx-auto px-8 py-10">
+            <main className="container mx-auto px-4 sm:px-8 py-6 sm:py-10">
                 <Outlet />
             </main>
         </div>

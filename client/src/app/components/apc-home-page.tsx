@@ -5,6 +5,16 @@ import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/app/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/app/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
 import { StatsCard } from "@/app/components/stats-card";
 import {
@@ -22,9 +32,12 @@ import {
   Loader2,
   Send,
   Settings,
+  Trash2,
+  ShieldAlert,
 } from "lucide-react";
 import { adminApi } from "@/app/lib/api";
 import { useSocket } from "@/app/socket-context";
+import { useAuth } from "@/app/auth-context";
 import { formatSlotLabel } from "@/app/lib/format";
 import { toast } from "sonner";
 
@@ -49,6 +62,7 @@ interface ScheduleItem {
 
 export function APCHomePage({ userName, stats, onNavigate }: APCHomePageProps) {
   const { socket } = useSocket();
+  const auth = useAuth();
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
   const [loadingSchedule, setLoadingSchedule] = useState(true);
 
@@ -65,6 +79,13 @@ export function APCHomePage({ userName, stats, onNavigate }: APCHomePageProps) {
   const [notifType, setNotifType] = useState("general");
   const [notifAudience, setNotifAudience] = useState("everyone");
   const [sendingNotif, setSendingNotif] = useState(false);
+
+  // ── Reset State ───────────────────────────────────────────────────────────────
+  const [showResetApcs, setShowResetApcs] = useState(false);
+  const [showResetStudents, setShowResetStudents] = useState(false);
+  const [showResetCocos, setShowResetCocos] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState("");
+  const [resetting, setResetting] = useState(false);
 
   const fetchSchedule = useCallback(async () => {
     setLoadingSchedule(true);
@@ -167,6 +188,50 @@ export function APCHomePage({ userName, stats, onNavigate }: APCHomePageProps) {
 
   const slotLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
+  // ── Reset Handlers ───────────────────────────────────────────────────────────
+  const handleResetApcs = async () => {
+    setResetting(true);
+    try {
+      const res: any = await adminApi.resetAllSubApcs();
+      toast.success(res.message || "All sub-APCs deleted");
+      setShowResetApcs(false);
+      setResetConfirmText("");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete sub-APCs");
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const handleResetStudents = async () => {
+    setResetting(true);
+    try {
+      const res: any = await adminApi.resetAllStudents();
+      toast.success(res.message || "All students deleted");
+      setShowResetStudents(false);
+      setResetConfirmText("");
+      fetchSchedule();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete students");
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const handleResetCocos = async () => {
+    setResetting(true);
+    try {
+      const res: any = await adminApi.resetAllCocos();
+      toast.success(res.message || "All CoCos deleted");
+      setShowResetCocos(false);
+      setResetConfirmText("");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete CoCos");
+    } finally {
+      setResetting(false);
+    }
+  };
+
   return (
     <>
       {/* Header Section */}
@@ -227,7 +292,7 @@ export function APCHomePage({ userName, stats, onNavigate }: APCHomePageProps) {
                 <Select value={String(selectedDay)} onValueChange={(v) => setSelectedDay(Number(v))}>
                   <SelectTrigger><SelectValue placeholder="Select Day" /></SelectTrigger>
                   <SelectContent>
-                    {[1, 2, 3].map((d) => (
+                    {Array.from({ length: 20 }, (_, i) => i + 1).map((d) => (
                       <SelectItem key={d} value={String(d)}>Day {d}</SelectItem>
                     ))}
                   </SelectContent>
@@ -421,6 +486,16 @@ export function APCHomePage({ userName, stats, onNavigate }: APCHomePageProps) {
               <UserCog className="h-6 w-6 text-green-600" />
               <span className="text-sm font-medium">Manage CoCos</span>
             </Button>
+            {auth.isMainAdmin && (
+              <Button
+                variant="outline"
+                className="h-auto py-4 flex-col gap-2 bg-white hover:bg-indigo-50 hover:border-indigo-300"
+                onClick={() => onNavigate("manage-apcs")}
+              >
+                <Award className="h-6 w-6 text-indigo-600" />
+                <span className="text-sm font-medium">Manage APCs</span>
+              </Button>
+            )}
             <Button
               variant="outline"
               className="h-auto py-4 flex-col gap-2 bg-white hover:bg-indigo-50 hover:border-indigo-300"
@@ -434,7 +509,7 @@ export function APCHomePage({ userName, stats, onNavigate }: APCHomePageProps) {
               className="h-auto py-4 flex-col gap-2 bg-white hover:bg-indigo-50 hover:border-indigo-300"
               onClick={() => onNavigate("queries")}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-amber-600"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-amber-600"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /></svg>
               <span className="text-sm font-medium">Student Queries</span>
             </Button>
             <Button
@@ -448,6 +523,138 @@ export function APCHomePage({ userName, stats, onNavigate }: APCHomePageProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* ──────── Database Reset Section ──────── */}
+      <Card className="border-red-200 mt-8">
+        <CardHeader className="border-b border-gray-100">
+          <CardTitle className="text-xl flex items-center gap-2 text-red-700">
+            <ShieldAlert className="h-5 w-5" />
+            Database Reset
+          </CardTitle>
+          <p className="text-sm text-gray-500 mt-1">Irreversible actions for tenure/phase transitions. Use with extreme caution.</p>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="flex flex-wrap gap-4">
+            {auth.isMainAdmin && (
+              <Button
+                variant="outline"
+                className="border-red-300 text-red-700 hover:bg-red-50"
+                onClick={() => { setResetConfirmText(""); setShowResetApcs(true); }}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete All APCs
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              className="border-red-300 text-red-700 hover:bg-red-50"
+              onClick={() => { setResetConfirmText(""); setShowResetStudents(true); }}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete All Students
+            </Button>
+            <Button
+              variant="outline"
+              className="border-red-300 text-red-700 hover:bg-red-50"
+              onClick={() => { setResetConfirmText(""); setShowResetCocos(true); }}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete All CoCos
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Reset Confirmation Dialogs ── */}
+      <AlertDialog open={showResetApcs} onOpenChange={setShowResetApcs}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-700">Delete All APCs</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all APC accounts except yours. This action cannot be undone.
+              <br /><br />
+              Type <strong>DELETE ALL APCS</strong> to confirm.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            value={resetConfirmText}
+            onChange={(e) => setResetConfirmText(e.target.value)}
+            placeholder="Type confirmation here"
+            className="mt-2"
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setResetConfirmText("")}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleResetApcs}
+              disabled={resetConfirmText !== "DELETE ALL APCS" || resetting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {resetting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Delete All APCs
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showResetStudents} onOpenChange={setShowResetStudents}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-700">Delete All Students</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all student accounts, their notifications, queries, and queue entries. This action cannot be undone.
+              <br /><br />
+              Type <strong>DELETE ALL STUDENTS</strong> to confirm.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            value={resetConfirmText}
+            onChange={(e) => setResetConfirmText(e.target.value)}
+            placeholder="Type confirmation here"
+            className="mt-2"
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setResetConfirmText("")}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleResetStudents}
+              disabled={resetConfirmText !== "DELETE ALL STUDENTS" || resetting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {resetting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Delete All Students
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showResetCocos} onOpenChange={setShowResetCocos}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-700">Delete All CoCos</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all coordinator accounts, their notifications, and remove all company assignments. This action cannot be undone.
+              <br /><br />
+              Type <strong>DELETE ALL COCOS</strong> to confirm.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            value={resetConfirmText}
+            onChange={(e) => setResetConfirmText(e.target.value)}
+            placeholder="Type confirmation here"
+            className="mt-2"
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setResetConfirmText("")}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleResetCocos}
+              disabled={resetConfirmText !== "DELETE ALL COCOS" || resetting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {resetting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Delete All CoCos
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

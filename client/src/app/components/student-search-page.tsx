@@ -189,7 +189,7 @@ export function StudentSearchPage({ onStudentClick, fetchApi, allowAdd = false }
                   Add Student
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl">
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Add New Student</DialogTitle>
                   <DialogDescription>

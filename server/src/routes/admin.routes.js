@@ -12,7 +12,8 @@ const {
   getQueries, respondToQuery,
   getDriveState, updateDriveState, sendBroadcastNotification,
   getApcNotifications, markApcNotifRead, clearAllApcNotifications,
-  updateApcProfile
+  updateApcProfile,
+  deleteAllSubApcs, deleteAllStudents, deleteAllCocos
 } = require("../controllers/admin.controller");
 const { protect } = require("../middlewares/auth.middleware");
 const { authorize } = require("../middlewares/role.middleware");
@@ -55,5 +56,10 @@ router.get("/notifications", getApcNotifications);
 router.put("/notifications/:id/read", markApcNotifRead);
 router.delete("/notifications", clearAllApcNotifications);
 router.put("/profile", updateApcProfile);
+
+// Bulk reset endpoints
+router.post("/reset/apcs", deleteAllSubApcs);
+router.post("/reset/students", deleteAllStudents);
+router.post("/reset/cocos", deleteAllCocos);
 
 module.exports = router;

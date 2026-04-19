@@ -154,7 +154,7 @@ export function CoCoProfilePage({ userId }: { userId: string }) {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="flex items-center"><Building2 className="h-5 w-5 mr-2 text-gray-600" />Currently Assigned Companies</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="flex items-center"><Building2 className="h-5 w-5 mr-2 text-gray-600" />Currently Assigned Company</CardTitle></CardHeader>
         <CardContent>
           {assignedCompanies.length === 0 ? (
             <div className="py-6 text-center text-gray-500">No companies assigned yet.</div>

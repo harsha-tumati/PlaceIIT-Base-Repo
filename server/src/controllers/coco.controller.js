@@ -414,6 +414,26 @@ const assignPanelStudent = async (req, res) => {
   }
 };
 
+// @desc    Delete a panel (only if unoccupied)
+// @route   DELETE /api/coco/panel/:id
+const deletePanel = async (req, res) => {
+  try {
+    const panel = await Panel.findById(req.params.id);
+    if (!panel) return res.status(404).json({ message: "Panel not found" });
+    if (panel.status === "occupied") {
+      return res.status(400).json({ message: "Cannot delete an occupied panel. End the current interview first." });
+    }
+    // Remove reference from the round if linked
+    if (panel.roundId) {
+      await InterviewRound.findByIdAndUpdate(panel.roundId, { $pull: { panels: panel._id } });
+    }
+    await Panel.findByIdAndDelete(panel._id);
+    res.json({ message: "Panel deleted successfully." });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // @desc    Clear a panel
 // @route   PUT /api/coco/panel/:id/clear
 const clearPanel = async (req, res) => {
@@ -699,6 +719,69 @@ const addRound = async (req, res) => {
     const { companyId, roundNumber, roundName } = req.body;
     const round = await roundService.createRound(companyId, roundNumber, roundName);
     res.status(201).json(round);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// @desc    Increment totalRounds for a company (used when CoCo adds a round)
+// @route   PATCH /api/coco/company/:companyId/total-rounds
+const incrementTotalRounds = async (req, res) => {
+  try {
+    const company = await Company.findById(req.params.companyId);
+    if (!company) return res.status(404).json({ message: "Company not found" });
+    // Always floor at 3 before incrementing so we never go below the minimum
+    const newTotal = Math.max(3, company.totalRounds || 3) + 1;
+    const updated = await Company.findByIdAndUpdate(
+      req.params.companyId,
+      { totalRounds: newTotal },
+      { new: true }
+    );
+    res.json({ totalRounds: updated.totalRounds });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// @desc    Delete a round (only if it has no active students)
+// @route   DELETE /api/coco/company/:companyId/round/:roundNumber
+const deleteRound = async (req, res) => {
+  try {
+    const { companyId, roundNumber } = req.params;
+    const rn = Number(roundNumber);
+
+    // Safety: never allow deleting rounds 1-3
+    if (rn <= 3) {
+      return res.status(400).json({ message: "Cannot delete the default rounds (1-3)" });
+    }
+
+    const round = await InterviewRound.findOne({ companyId, roundNumber: rn });
+    const roundNameStr = round ? (round.roundName || `Round ${rn}`) : `Round ${rn}`;
+
+    // Check for any active students in this round
+    const activeCount = await Queue.countDocuments({
+      companyId,
+      round: roundNameStr,
+      status: { $in: ["in_queue", "in_interview", "on_hold", "pending", "not_joined"] },
+    });
+
+    if (activeCount > 0) {
+      return res.status(400).json({
+        message: `Cannot delete Round ${rn}: it still has ${activeCount} active student(s).`,
+      });
+    }
+
+    // Delete the InterviewRound doc if it exists
+    if (round) await InterviewRound.findByIdAndDelete(round._id);
+
+    // Decrement totalRounds (but never below 3)
+    const company = await Company.findById(companyId);
+    if (company) {
+      const newTotal = Math.max(3, (company.totalRounds || 3) - 1);
+      await Company.findByIdAndUpdate(companyId, { totalRounds: newTotal });
+    }
+
+    res.json({ message: `Round ${rn} deleted successfully.` });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -1061,11 +1144,11 @@ const updateCocoProfile = async (req, res) => {
 module.exports = {
   getAssignedCompany, getShortlistedStudents, addStudentToQueue,
   updateStudentStatus, sendNotification, toggleWalkIn,
-  addPanel, getPanels, updatePanel, assignPanelStudent, clearPanel,
+  addPanel, getPanels, updatePanel, assignPanelStudent, clearPanel, deletePanel,
   getRounds, addRound, getPredefinedNotifications,
   searchAllStudents, addStudentToRound, uploadStudentsToRound,
   getCocoNotifications, markNotifRead, clearAllNotifications, addStudentToCompany,
   promoteStudentsViaExcel,
   getPendingRequests, acceptStudent, rejectStudent, markCompleted,
-  updateCompanyVenue, updateCocoProfile,
+  updateCompanyVenue, updateCocoProfile, incrementTotalRounds, deleteRound,
 };

@@ -10,7 +10,7 @@ import {
 import {
   Building2, Users, UserPlus, Search, Phone, AlertCircle, CheckCircle,
   RotateCw, CircleDot, MapPin, XCircle, UserCheck, Loader2, Send, Edit,
-  Pencil, Mail, UserX, Clock
+  Pencil, Mail, UserX, Clock, Trash2
 } from "lucide-react";
 import { cocoApi } from "@/app/lib/api";
 import { useSocket } from "@/app/socket-context";
@@ -546,6 +546,16 @@ export function CoCoHomePage({ companyName, onRoundTracking }: CoCoHomePageProps
     }
   };
 
+  const handleDeletePanel = async (panelId: string, panelName: string) => {
+    try {
+      await cocoApi.deletePanel(panelId);
+      toast.success(`${panelName} deleted.`);
+      setPanels(prev => prev.filter(p => p.id !== panelId));
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to delete panel");
+    }
+  };
+
   /* ── helpers ── */
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -913,12 +923,22 @@ export function CoCoHomePage({ companyName, onRoundTracking }: CoCoHomePageProps
                       </div>
 
                       {/* Action buttons — pushed to bottom */}
-                      <div className="pt-1 mt-auto">
+                      <div className="pt-1 mt-auto space-y-2">
                         {panel.status === "unoccupied" ? (
-                          <Button className="w-full bg-green-600 hover:bg-green-700 text-white" onClick={() => handleAssignNextToPanel(panel)}>
-                            <UserPlus className="h-4 w-4 mr-2" />
-                            Assign Next from Queue
-                          </Button>
+                          <>
+                            <Button className="w-full bg-green-600 hover:bg-green-700 text-white" onClick={() => handleAssignNextToPanel(panel)}>
+                              <UserPlus className="h-4 w-4 mr-2" />
+                              Assign Next from Queue
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="w-full border-red-300 text-red-500 hover:bg-red-50 hover:text-red-600"
+                              onClick={() => handleDeletePanel(panel.id, panel.name)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete Panel
+                            </Button>
+                          </>
                         ) : (
                           <Button className="w-full" variant="destructive" onClick={() => handleClearPanel(panel.id)}>
                             <XCircle className="h-4 w-4 mr-2" />

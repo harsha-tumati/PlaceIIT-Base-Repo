@@ -263,7 +263,6 @@ export function StudentNotificationsPage() {
               <SelectTrigger className="w-full md:w-48"><SelectValue placeholder="Filter by Type" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="success">Success</SelectItem>
                 <SelectItem value="warning">Alert</SelectItem>
                 <SelectItem value="info">Info</SelectItem>
               </SelectContent>

@@ -1120,6 +1120,89 @@ const updateApcProfile = async (req, res) => {
   }
 };
 
+// ═══════════════════════════════════════════════════════════
+//   BULK RESET ENDPOINTS (Tenure / Phase Transition)
+// ═══════════════════════════════════════════════════════════
+
+// @desc    Delete ALL sub-APCs (every APC except the logged-in main admin)
+// @route   POST /api/admin/reset/apcs
+const deleteAllSubApcs = async (req, res) => {
+  try {
+    const reqUser = await User.findById(req.user.id);
+    if (!reqUser || !reqUser.isMainAdmin) {
+      return res.status(403).json({ message: "Only the main admin can perform this action" });
+    }
+
+    // Find all APCs whose userId is NOT the current user
+    const apcsToDelete = await Apc.find({ userId: { $ne: req.user.id } });
+    const userIds = apcsToDelete.map((a) => a.userId);
+
+    // Delete their User accounts and Apc records
+    await User.deleteMany({ _id: { $in: userIds } });
+    await Apc.deleteMany({ userId: { $ne: req.user.id } });
+
+    await emitStatsUpdate();
+    res.json({ message: `${apcsToDelete.length} sub-APC(s) deleted successfully` });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// @desc    Delete ALL students and their related data
+// @route   POST /api/admin/reset/students
+const deleteAllStudents = async (req, res) => {
+  try {
+    const Queue = require("../models/Queue.model");
+    const Query = require("../models/Query.model");
+
+    // Get all student user IDs for notification cleanup
+    const studentUsers = await User.find({ role: "student" }).select("_id");
+    const studentUserIds = studentUsers.map((u) => u._id);
+
+    // Clean up company shortlists
+    await Company.updateMany({}, { $set: { shortlistedStudents: [] } });
+
+    // Delete queue entries, queries, and notifications for students
+    await Queue.deleteMany({});
+    await Query.deleteMany({ studentUserId: { $in: studentUserIds } });
+    await Notification.deleteMany({ recipientId: { $in: studentUserIds } });
+
+    // Delete student records and user accounts
+    await Student.deleteMany({});
+    await User.deleteMany({ role: "student" });
+
+    await emitStatsUpdate();
+    res.json({ message: `${studentUserIds.length} student(s) and all related data deleted successfully` });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// @desc    Delete ALL CoCos and their related data
+// @route   POST /api/admin/reset/cocos
+const deleteAllCocos = async (req, res) => {
+  try {
+    // Get all coordinator user IDs
+    const cocoUsers = await User.find({ role: "coco" }).select("_id");
+    const cocoUserIds = cocoUsers.map((u) => u._id);
+
+    // Clean up company coco assignments
+    await Company.updateMany({}, { $set: { assignedCocos: [] } });
+
+    // Delete notifications for cocos
+    await Notification.deleteMany({ recipientId: { $in: cocoUserIds } });
+
+    // Delete coordinator records and user accounts
+    await Coordinator.deleteMany({});
+    await User.deleteMany({ role: "coco" });
+
+    await emitStatsUpdate();
+    res.json({ message: `${cocoUserIds.length} CoCo(s) and all related data deleted successfully` });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 module.exports = {
   getStats, getCompanies, addCompany, updateCompany,
   searchStudents, getStudentCompanies, getCocos, addCoco, addStudent, getApcs, addApc, removeApc,
@@ -1129,5 +1212,6 @@ module.exports = {
   getQueries, respondToQuery,
   getDriveState, updateDriveState, sendBroadcastNotification,
   getApcNotifications, markApcNotifRead, clearAllApcNotifications,
-  updateApcProfile
+  updateApcProfile,
+  deleteAllSubApcs, deleteAllStudents, deleteAllCocos
 };

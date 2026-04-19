@@ -5,13 +5,13 @@ const upload = multer({ dest: "uploads/" });
 const {
   getAssignedCompany, getShortlistedStudents, addStudentToQueue,
   updateStudentStatus, sendNotification, toggleWalkIn,
-  addPanel, getPanels, updatePanel, assignPanelStudent, clearPanel,
+  addPanel, getPanels, updatePanel, assignPanelStudent, clearPanel, deletePanel,
   getRounds, addRound, getPredefinedNotifications,
   searchAllStudents, addStudentToRound, uploadStudentsToRound,
   getCocoNotifications, markNotifRead, clearAllNotifications, addStudentToCompany,
   promoteStudentsViaExcel,
   getPendingRequests, acceptStudent, rejectStudent, markCompleted,
-  updateCompanyVenue, updateCocoProfile,
+  updateCompanyVenue, updateCocoProfile, incrementTotalRounds, deleteRound,
 } = require("../controllers/coco.controller");
 const { getStudentCompanies, getDriveState } = require("../controllers/admin.controller");
 const { protect } = require("../middlewares/auth.middleware");
@@ -27,6 +27,8 @@ router.get("/company/:companyId/panels", getPanels);
 router.get("/company/:companyId/pending", getPendingRequests);
 router.put("/company/:companyId/walkin", toggleWalkIn);
 router.put("/company/:companyId/venue", updateCompanyVenue);
+router.patch("/company/:companyId/total-rounds", incrementTotalRounds);
+router.delete("/company/:companyId/round/:roundNumber", deleteRound);
 router.post("/queue/add", addStudentToQueue);
 router.put("/queue/status", updateStudentStatus);
 router.put("/queue/accept", acceptStudent);
@@ -41,6 +43,7 @@ router.post("/panel", addPanel);
 router.put("/panel/:id", updatePanel);
 router.put("/panel/:id/assign", assignPanelStudent);
 router.put("/panel/:id/clear", clearPanel);
+router.delete("/panel/:id", deletePanel);
 router.post("/round", addRound);
 router.post("/round/add-student", addStudentToRound);
 router.post("/round/upload-students", upload.single("file"), uploadStudentsToRound);

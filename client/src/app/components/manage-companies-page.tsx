@@ -378,7 +378,7 @@ export function ManageCompaniesPage({ onCompanyClick }: ManageCompaniesPageProps
                 Add Company
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add New Company</DialogTitle>
                 <DialogDescription>Enter the company details for placement interviews.</DialogDescription>
@@ -394,7 +394,7 @@ export function ManageCompaniesPage({ onCompanyClick }: ManageCompaniesPageProps
                     <Select value={newCompanyDay} onValueChange={setNewCompanyDay}>
                       <SelectTrigger><SelectValue placeholder="Select day" /></SelectTrigger>
                       <SelectContent>
-                        {[1, 2, 3].map((d) => (
+                        {Array.from({ length: 20 }, (_, i) => i + 1).map((d) => (
                           <SelectItem key={d} value={`Day ${d}`}>Day {d}</SelectItem>
                         ))}
                       </SelectContent>
@@ -500,11 +500,10 @@ export function ManageCompaniesPage({ onCompanyClick }: ManageCompaniesPageProps
                     <UserCog className="h-5 w-5 text-indigo-600 mt-0.5" />
                     <div className="flex-1">
                       <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">CoCo Assigned</div>
-                      <div className={`font-semibold ${
-                        company.cocoAssigned === "Completed" ? "text-green-600" :
+                      <div className={`font-semibold ${company.cocoAssigned === "Completed" ? "text-green-600" :
                         company.cocoAssigned === "Upcoming" ? "text-blue-600" :
-                        "text-gray-900"
-                      }`}>{company.cocoAssigned}</div>
+                          "text-gray-900"
+                        }`}>{company.cocoAssigned}</div>
                     </div>
                   </div>
                   <div className="flex items-start gap-3 bg-gray-50 p-4 rounded-lg">

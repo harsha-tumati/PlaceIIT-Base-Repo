@@ -517,7 +517,7 @@ export function ManageCoCoPage({ onCoCoClick }: ManageCoCoPageProps) {
                 Add CoCo
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add New CoCo</DialogTitle>
                 <DialogDescription>

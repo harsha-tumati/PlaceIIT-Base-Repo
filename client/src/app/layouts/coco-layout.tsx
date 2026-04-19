@@ -75,7 +75,7 @@ export function CoCoLayout() {
                 userName={auth.userName}
                 unreadNotifications={auth.cocoUnreadNotificationsCount}
             />
-            <main className="container mx-auto px-8 py-10">
+            <main className="container mx-auto px-4 sm:px-8 py-6 sm:py-10">
                 <Outlet />
             </main>
         </div>

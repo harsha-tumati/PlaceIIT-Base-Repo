@@ -18,7 +18,7 @@ export function StudentLayout() {
                 const unread = list.filter((n: any) => !n.isRead && !n.read).length;
                 auth.setUnreadNotificationsCount(unread);
             })
-            .catch(() => {});
+            .catch(() => { });
     };
 
     useEffect(() => {
@@ -66,7 +66,7 @@ export function StudentLayout() {
                 userName={auth.userName}
                 unreadNotifications={auth.unreadNotificationsCount}
             />
-            <main className="container mx-auto px-8 py-10">
+            <main className="container mx-auto px-4 sm:px-8 py-6 sm:py-10">
                 <Outlet />
             </main>
         </div>

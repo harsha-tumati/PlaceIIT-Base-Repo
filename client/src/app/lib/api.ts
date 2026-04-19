@@ -219,6 +219,8 @@ export const cocoApi = {
         request(`/coco/panel/${panelId}/assign`, { method: "PUT", body: JSON.stringify(data) }),
     clearPanel: (panelId: string) =>
         request(`/coco/panel/${panelId}/clear`, { method: "PUT" }),
+    deletePanel: (panelId: string) =>
+        request(`/coco/panel/${panelId}`, { method: "DELETE" }),
     addRound: (data: Record<string, unknown>) =>
         request("/coco/round", { method: "POST", body: JSON.stringify(data) }),
     searchStudents: (query: string) =>
@@ -248,6 +250,10 @@ export const cocoApi = {
     markCompleted: (data: { studentId: string; companyId: string; round?: string }) =>
         request("/coco/queue/complete", { method: "PUT", body: JSON.stringify(data) }),
     getDriveState: () => request("/coco/drive-state"),
+    incrementTotalRounds: (companyId: string) =>
+        request(`/coco/company/${companyId}/total-rounds`, { method: "PATCH" }),
+    deleteRound: (companyId: string, roundNumber: number) =>
+        request(`/coco/company/${companyId}/round/${roundNumber}`, { method: "DELETE" }),
 };
 
 /* ═══════════════════════════════════════════════════════════
@@ -328,6 +334,13 @@ export const adminApi = {
         request(`/admin/notifications/${id}/read`, { method: "PUT" }),
     clearAllNotifications: () =>
         request("/admin/notifications", { method: "DELETE" }),
+    // Bulk reset endpoints
+    resetAllSubApcs: () =>
+        request("/admin/reset/apcs", { method: "POST" }),
+    resetAllStudents: () =>
+        request("/admin/reset/students", { method: "POST" }),
+    resetAllCocos: () =>
+        request("/admin/reset/cocos", { method: "POST" }),
 };
 
 /* ═══════════════════════════════════════════════════════════
