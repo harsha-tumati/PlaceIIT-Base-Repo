@@ -334,7 +334,7 @@ const getPanels = async (req, res) => {
 // @route   PUT /api/coco/panel/:id
 const updatePanel = async (req, res) => {
   try {
-    const { roundId, roundNumber, venue, status } = req.body;
+    const { roundId, roundNumber, venue, status, interviewers } = req.body;
     const panelInfo = await Panel.findById(req.params.id);
     if (!panelInfo) return res.status(404).json({ message: "Panel not found" });
 
@@ -355,6 +355,7 @@ const updatePanel = async (req, res) => {
     if (resolvedRoundId !== undefined) updateData.roundId = resolvedRoundId;
     if (venue !== undefined) updateData.venue = venue;
     if (status !== undefined) updateData.status = status;
+    if (interviewers !== undefined) updateData.interviewers = interviewers;
 
     const panel = await Panel.findByIdAndUpdate(req.params.id, updateData, { new: true });
 
@@ -391,6 +392,16 @@ const assignPanelStudent = async (req, res) => {
 
     const roundNameStr = panel.roundId ? (panel.roundId.roundName || `Round ${panel.roundId.roundNumber}`) : "Round 1";
     let queueEntry = await Queue.findOne({ studentId, companyId: panel.companyId, round: roundNameStr }).sort({ createdAt: -1 });
+
+    // Reject assignment if student is flagged as absent (on_hold)
+    if (queueEntry && queueEntry.status === "on_hold") {
+      // Revert panel state
+      panel.status = "unoccupied";
+      panel.currentStudent = null;
+      await panel.save();
+      return res.status(400).json({ message: "This student is flagged as absent. Please assign the next available student in queue." });
+    }
+
     if (queueEntry) {
       queueEntry.status = "in_interview";
       queueEntry.panelId = panel._id;

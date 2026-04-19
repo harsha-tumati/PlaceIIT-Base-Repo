@@ -24,7 +24,7 @@ interface Student {
   rollNo: string;
   contact: string;
   emergencyContact: string;
-  status: "in-queue" | "in-interview" | "completed" | "unassigned";
+  status: "in-queue" | "in-interview" | "completed" | "unassigned" | "on-hold";
   round: number;
   position: number;
   locationStatus: "in-queue" | "in-interview" | "no-show" | "completed-day";
@@ -152,8 +152,8 @@ export function CoCoHomePage({ companyName, onRoundTracking }: CoCoHomePageProps
       completed: "completed", done: "completed",
       unassigned: "unassigned",
       pending: "in-queue",
-      on_hold: "in-queue",
-      on_hold_active: "in-queue",
+      on_hold: "on-hold",
+      on_hold_active: "on-hold",
       not_joined: "unassigned",
     };
     return {
@@ -343,6 +343,7 @@ export function CoCoHomePage({ companyName, onRoundTracking }: CoCoHomePageProps
         "in-interview": "in_interview",
         completed: "completed",
         unassigned: "not_joined",
+        "on-hold": "on_hold",
       };
 
       await cocoApi.updateStudentStatus({
@@ -521,7 +522,19 @@ export function CoCoHomePage({ companyName, onRoundTracking }: CoCoHomePageProps
   };
 
   const handleAssignNextToPanel = async (panel: Panel) => {
-    const roundQueue = students.filter(s => s.status === "in-queue" && s.round === panel.currentRound);
+    // Re-fetch fresh student data to avoid stale-data race conditions
+    // (e.g. a student was just flagged absent but local state hasn't updated yet)
+    let freshStudents = students;
+    try {
+      if (company.id) {
+        const studentsData: any = await cocoApi.getShortlistedStudents(company.id).catch(() => []);
+        const sList = Array.isArray(studentsData) ? studentsData : studentsData.students ?? [];
+        freshStudents = sList.map((s: any, i: number) => normalizeStudent(s, i, company.name));
+      }
+    } catch { /* fall back to current students state */ }
+
+    // Filter for in-queue students only (on-hold/flagged-absent are excluded by status check)
+    const roundQueue = freshStudents.filter(s => s.status === "in-queue" && s.round === panel.currentRound);
     if (!roundQueue.length) {
       return toast.error("No students currently waiting in queue for Round " + panel.currentRound);
     }
@@ -532,7 +545,8 @@ export function CoCoHomePage({ companyName, onRoundTracking }: CoCoHomePageProps
       toast.success(`Assigned ${nextStudent.name} to ${panel.name}`);
       fetchData();
     } catch (err: any) {
-      toast.error("Failed to assign student");
+      toast.error(err.message ?? "Failed to assign student");
+      fetchData();
     }
   };
 
@@ -796,11 +810,13 @@ export function CoCoHomePage({ companyName, onRoundTracking }: CoCoHomePageProps
                             onChange={(e) => setEditingVenueValue(e.target.value)}
                             onBlur={() => {
                               setPanels(prev => prev.map(p => p.id === panel.id ? { ...p, room: editingVenueValue } : p));
+                              cocoApi.updatePanel(panel.id, { venue: editingVenueValue }).catch(() => toast.error("Failed to save venue"));
                               setEditingVenue(null);
                             }}
                             onKeyDown={(e) => {
                               if (e.key === "Enter") {
                                 setPanels(prev => prev.map(p => p.id === panel.id ? { ...p, room: editingVenueValue } : p));
+                                cocoApi.updatePanel(panel.id, { venue: editingVenueValue }).catch(() => toast.error("Failed to save venue"));
                                 setEditingVenue(null);
                               }
                             }}
@@ -885,22 +901,18 @@ export function CoCoHomePage({ companyName, onRoundTracking }: CoCoHomePageProps
                                   value={editingMemberValue}
                                   onChange={(e) => setEditingMemberValue(e.target.value)}
                                   onBlur={() => {
-                                    setPanels(prev => prev.map(p => {
-                                      if (p.id !== panel.id) return p;
-                                      const newMembers = [...p.members];
-                                      newMembers[idx] = editingMemberValue;
-                                      return { ...p, members: newMembers };
-                                    }));
+                                    const newMembers = [...panel.members];
+                                    newMembers[idx] = editingMemberValue;
+                                    setPanels(prev => prev.map(p => p.id === panel.id ? { ...p, members: newMembers } : p));
+                                    cocoApi.updatePanel(panel.id, { interviewers: newMembers }).catch(() => toast.error("Failed to save panel member"));
                                     setEditingMember(null);
                                   }}
                                   onKeyDown={(e) => {
                                     if (e.key === "Enter") {
-                                      setPanels(prev => prev.map(p => {
-                                        if (p.id !== panel.id) return p;
-                                        const newMembers = [...p.members];
-                                        newMembers[idx] = editingMemberValue;
-                                        return { ...p, members: newMembers };
-                                      }));
+                                      const newMembers = [...panel.members];
+                                      newMembers[idx] = editingMemberValue;
+                                      setPanels(prev => prev.map(p => p.id === panel.id ? { ...p, members: newMembers } : p));
+                                      cocoApi.updatePanel(panel.id, { interviewers: newMembers }).catch(() => toast.error("Failed to save panel member"));
                                       setEditingMember(null);
                                     }
                                   }}
