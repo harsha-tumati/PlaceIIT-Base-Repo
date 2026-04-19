@@ -392,6 +392,8 @@ const updateStatus = async (studentId, companyId, status, roundId = null, panelI
   }
   if (!entry) throw new Error("Queue entry not found");
 
+  const oldStatus = entry.status; // capture before mutation
+
   entry.status = status;
   if (roundId) entry.roundId = roundId;
   if (panelId) entry.panelId = panelId;
@@ -405,7 +407,25 @@ const updateStatus = async (studentId, companyId, status, roundId = null, panelI
   if ([STUDENT_STATUS.COMPLETED, STUDENT_STATUS.REJECTED, STUDENT_STATUS.EXITED].includes(status))
     entry.completedAt = new Date();
 
+  // When resuming from on_hold (flagged absent) → in_queue, place at top of queue (position 1)
+  if (oldStatus === STUDENT_STATUS.ON_HOLD && status === STUDENT_STATUS.IN_QUEUE) {
+    // Bump all existing in_queue students' positions up by 1 to make room at position 1
+    const scope = entry.roundId ? { roundId: entry.roundId } : { round: entry.round };
+    await Queue.updateMany(
+      {
+        companyId,
+        ...scope,
+        status: { $in: [STUDENT_STATUS.IN_QUEUE, STUDENT_STATUS.IN_INTERVIEW] },
+        _id: { $ne: entry._id },
+      },
+      { $inc: { position: 1 } }
+    );
+    entry.position = 1;
+  }
+
   await entry.save();
+
+
 
   if (status !== STUDENT_STATUS.IN_INTERVIEW) {
     await Panel.updateMany(
