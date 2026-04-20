@@ -182,6 +182,21 @@ const deleteCompany = async (req, res) => {
       )
     );
 
+    // Notify CoCos as well
+    const assignedCocos = await Coordinator.find({ assignedCompanies: id });
+    await Promise.all(
+      assignedCocos.map(coco => 
+        sendNotification({
+          recipientId: coco.userId,
+          senderId: req.user.id,
+          senderModel: "User",
+          source: "apc",
+          message: `The company ${company.name} has been removed from the schedule. You have been unassigned.`,
+          type: "alert"
+        }).catch(err => console.error("Coco notification failed", err))
+      )
+    );
+
     // Remove from Coordinator's assignedCompanies
     await Coordinator.updateMany(
       { assignedCompanies: id },
