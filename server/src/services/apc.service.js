@@ -16,8 +16,8 @@ const createApc = async (data) => {
   }
 
   const finalRollNumber = String(rollNumber).trim();
-  if (!/^\d+$/.test(finalRollNumber)) {
-    throw new Error("Institute ID must contain only numbers");
+  if (!/^[A-Za-z0-9]+$/.test(finalRollNumber)) {
+    throw new Error("Institute ID must contain only letters and numbers");
   }
 
   // Validate email format

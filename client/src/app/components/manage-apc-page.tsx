@@ -110,20 +110,28 @@ export function ManageApcPage() {
   const handleConfirmUpload = async () => {
     if (files.length === 0) return;
     setUploading(true);
-    let errorCount = 0;
+    let totalProcessed = 0;
+    let totalProblems = 0;
     try {
       for (const file of files) {
         const formData = new FormData();
         formData.append("file", file);
         const res: any = await adminApi.uploadApcExcel(formData);
-        if (res.errors?.length > 0) {
-          errorCount += res.errors.length;
-          console.warn(`Excel import errors in ${file.name}:`, res.errors);
+        totalProcessed += res.processed ?? 0;
+        if (res.problemList?.length > 0) {
+          totalProblems += res.problemList.length;
+          console.warn(`Excel import problems in ${file.name}:`, res.problemList);
+          for (const p of res.problemList) {
+            toast.error(p, { duration: 8000 });
+          }
         }
       }
-      toast.success("APCs uploaded successfully");
-      if (errorCount > 0) {
-        toast.warning(`${errorCount} row(s) had issues across files. Check console.`);
+      if (totalProcessed > 0) {
+        toast.success(`${totalProcessed} APC(s) imported successfully`);
+      } else if (totalProblems > 0) {
+        toast.error("No APCs were imported. Check the errors above.");
+      } else {
+        toast.warning("No APCs were found in the uploaded file(s).");
       }
       setIsAddDialogOpen(false);
       setFiles([]);
